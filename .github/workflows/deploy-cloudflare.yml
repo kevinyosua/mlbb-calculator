@@ -53,6 +53,10 @@ jobs:
   preview:
     name: Preview deploy
     needs: verify
+    # The Cloudflare credentials live in an environment, not at repository level,
+    # so the job has to name that environment. Without this the secrets resolve
+    # to an empty string and wrangler reports a missing CLOUDFLARE_API_TOKEN.
+    environment: cf
     # Forks do not get repository secrets, so only deploy same-repo branches.
     if: >-
       (github.event_name == 'pull_request' &&
@@ -78,11 +82,38 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Verify credentials
+      # `wrangler whoami` exits 0 even when unauthenticated, so it cannot be
+      # used as a gate. Asking the API instead proves three things at once:
+      # the token is valid, it has Pages access, and the project exists.
+      - name: Verify credentials and project
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler whoami
+        run: |
+          missing=0
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is empty or unset. Add it under Settings -> Secrets and variables -> Actions -> Secrets."
+            missing=1
+          fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID is empty or unset. Add it under Settings -> Secrets and variables -> Actions -> Secrets."
+            missing=1
+          fi
+          if [ "$missing" -eq 1 ]; then
+            exit 1
+          fi
+
+          body="${RUNNER_TEMP:-/tmp}/cf-response.json"
+          status=$(curl -sS -o "$body" -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT")
+          if [ "$status" != "200" ]; then
+            echo "::error::Cloudflare rejected the request (HTTP $status)."
+            grep -o '"message":"[^"]*"' "$body" || cat "$body"
+            echo "The token needs Account -> Cloudflare Pages -> Edit. The built-in 'Edit Cloudflare Workers' template does not grant it."
+            exit 1
+          fi
+          echo "Token is valid and the Pages project \"$PAGES_PROJECT\" exists."
 
       - name: Deploy
         env:
@@ -104,6 +135,8 @@ jobs:
   production:
     name: Production deploy
     needs: verify
+    # Must match the environment that holds the Cloudflare secrets; see preview.
+    environment: cf
     if: >-
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch' && inputs.target == 'production')
@@ -123,11 +156,38 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Verify credentials
+      # `wrangler whoami` exits 0 even when unauthenticated, so it cannot be
+      # used as a gate. Asking the API instead proves three things at once:
+      # the token is valid, it has Pages access, and the project exists.
+      - name: Verify credentials and project
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm exec wrangler whoami
+        run: |
+          missing=0
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is empty or unset. Add it under Settings -> Secrets and variables -> Actions -> Secrets."
+            missing=1
+          fi
+          if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID is empty or unset. Add it under Settings -> Secrets and variables -> Actions -> Secrets."
+            missing=1
+          fi
+          if [ "$missing" -eq 1 ]; then
+            exit 1
+          fi
+
+          body="${RUNNER_TEMP:-/tmp}/cf-response.json"
+          status=$(curl -sS -o "$body" -w '%{http_code}' \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PAGES_PROJECT")
+          if [ "$status" != "200" ]; then
+            echo "::error::Cloudflare rejected the request (HTTP $status)."
+            grep -o '"message":"[^"]*"' "$body" || cat "$body"
+            echo "The token needs Account -> Cloudflare Pages -> Edit. The built-in 'Edit Cloudflare Workers' template does not grant it."
+            exit 1
+          fi
+          echo "Token is valid and the Pages project \"$PAGES_PROJECT\" exists."
 
       # --branch must match the Pages project's production branch, otherwise
       # Cloudflare treats the upload as a preview deployment.

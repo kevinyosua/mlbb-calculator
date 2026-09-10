@@ -71,9 +71,9 @@ Cloudflare dashboard -> Workers & Pages -> Overview. The Account ID is in the
 right sidebar. (With no zone in the account, the Workers & Pages overview is the
 easiest place to read it.)
 
-### 4. Add two repository secrets
+### 4. Add the two secrets
 
-GitHub -> repo -> Settings -> Secrets and variables -> Actions -> New repository secret:
+GitHub -> repo -> Settings -> Secrets and variables -> Actions.
 
 | Secret | Value |
 | --- | --- |
@@ -81,6 +81,33 @@ GitHub -> repo -> Settings -> Secrets and variables -> Actions -> New repository
 | `CLOUDFLARE_ACCOUNT_ID` | the ID from step 3 |
 
 Never commit these values. The workflow reads them from `secrets.*` only.
+
+There are two places they can live, and this repo uses the second one.
+
+**Repository secrets** (the "Repository secrets" box): readable by every job in
+the repo. The simplest option.
+
+**Environment secrets** (the "Environment secrets" box), inside an environment
+named `cf`. This is how the repo is set up, so both deploy jobs declare
+`environment: cf`. An environment secret is readable **only** by a job that
+names its environment. Everywhere else it resolves to an empty string and the
+deploy dies with:
+
+```
+In a non-interactive environment, it's necessary to set a CLOUDFLARE_API_TOKEN
+environment variable for wrangler to work.
+```
+
+So if you rename that environment, change `environment:` on the `preview` and
+`production` jobs in
+[`deploy-cloudflare.yml`](../.github/workflows/deploy-cloudflare.yml) to match.
+
+Do not put them in the **Variables** tab: those are plain text, and no secret
+name resolves from there. If the same name exists both at repository and at
+environment level, the environment value wins.
+
+The `Verify credentials and project` step catches all of this before the upload
+and says which secret is missing.
 
 ### 5. Set the project name
 
@@ -206,7 +233,7 @@ Deleting this file will break the deploy job. So will removing either entry.
 
 | Symptom | Cause |
 | --- | --- |
-| `In a non-interactive environment, it's necessary to set a CLOUDFLARE_API_TOKEN` | `CLOUDFLARE_API_TOKEN` is not set on the step. Check the secret exists and its name matches exactly. |
+| `In a non-interactive environment, it's necessary to set a CLOUDFLARE_API_TOKEN` | The secret resolved to an empty string: it does not exist, is named differently, sits in the Variables tab, or is an environment secret in an environment the job does not name. |
 | `You are not authenticated` | The token was sent but Cloudflare rejected it: wrong value, revoked, or expired. |
 | `ERR_PNPM_IGNORED_BUILDS` | A build script was not approved. Add the package to `allowBuilds` in `pnpm-workspace.yaml`. |
 | `The Pages project "x" does not exist.` | Project name mismatch. See step 5. Wrangler never creates the project for you in CI. |
@@ -222,8 +249,10 @@ Deleting this file will break the deploy job. So will removing either entry.
 - `actions/*` use tags because GitHub owns those repositories; everything
   third-party is pinned to a full commit SHA, since a tag can be moved.
 - To require human approval before a production deploy, add a required reviewer
-  to an environment and reference it from the `production` job:
-  Settings -> Environments.
+  to the `cf` environment (Settings -> Environments). Both deploy jobs already
+  reference it. Be aware that a job cannot read environment secrets until a
+  reviewer approves, so this also gates the preview deploy; split preview and
+  production into two environments if you only want to gate production.
 - `pnpm/setup@v2` installs pnpm 11+ only. If you ever pin pnpm back to 10 or
   older, switch both workflows to `pnpm/action-setup@v6` plus
   `actions/setup-node`, because the successor action does not support pnpm 10.
@@ -234,5 +263,9 @@ Deleting this file will break the deploy job. So will removing either entry.
   `cloudflare/wrangler-action`. The action runs wrangler internally and, when it
   fails, reports only `The process '.../pnpm' failed with exit code 1`, hiding
   wrangler's own error message. Calling wrangler directly puts the real error in
-  the log. Its "Verify credentials" step runs `wrangler whoami` first, so an
-  auth problem fails on its own step with a readable message.
+  the log.
+- The "Verify credentials and project" step gate is there because
+  `wrangler whoami` **exits 0 even when it is not authenticated**, so it cannot
+  be used as a check. The step queries the Pages API instead: HTTP 200 proves the
+  token is valid, has Pages access, and that the project exists, all before any
+  upload starts.

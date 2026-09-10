@@ -1,0 +1,11 @@
+# pnpm 12 refuses to run a dependency's build scripts unless the package is
+# approved here; without this, installing wrangler fails with
+# ERR_PNPM_IGNORED_BUILDS.
+#
+# Both packages need their postinstall step: esbuild and workerd download and
+# wire up the platform binary they ship separately from the npm tarball.
+# Neither is a dependency of this app. They arrive only when the deploy
+# workflow installs wrangler, which is why the approval lives here.
+allowBuilds:
+  esbuild: true
+  workerd: true

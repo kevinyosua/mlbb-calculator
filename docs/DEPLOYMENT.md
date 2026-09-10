@@ -171,6 +171,41 @@ No. `wrangler pages deploy` takes everything it needs as flags, and Pages
 projects are not configured from `wrangler.toml` the way Workers are. Adding one
 would only risk Cloudflare mistaking this for a Workers project.
 
+## Why pnpm-workspace.yaml exists
+
+The repo has no workspace packages. The file is there for one setting:
+
+```yaml
+allowBuilds:
+  esbuild: true
+  workerd: true
+```
+
+pnpm 12 does not run a dependency's build scripts unless the package is approved
+here, and a skipped script is a hard error, not a warning. The deploy job
+installs wrangler, which pulls in both packages, so without this the job died on:
+
+```
+ERR_PNPM_IGNORED_BUILDS
+  Ignored build scripts: esbuild@0.28.1, workerd@1.20260908.1
+```
+
+Both need their `postinstall`: each ships its platform binary outside the npm
+tarball and downloads it there. Neither is a dependency of the app itself, which
+is why the approval sits beside the app rather than inside it.
+
+Deleting this file will break the deploy job. So will removing either entry.
+
+## Troubleshooting
+
+| Symptom | Cause |
+| --- | --- |
+| `ERR_PNPM_IGNORED_BUILDS` | A build script was not approved. Add the package to `allowBuilds` in `pnpm-workspace.yaml`. |
+| `The Pages project "x" does not exist.` | Project name mismatch. See step 5. Wrangler never creates the project for you in CI. |
+| `Authentication error` / `Unable to authenticate` | `CLOUDFLARE_API_TOKEN` is missing, expired, or lacks Account -> Cloudflare Pages -> Edit. |
+| A push to `main` produced a preview URL | The Pages project's production branch is not `main`, so `--branch=main` did not match it. |
+| `Could not resolve to a Repository` | Fork PR. Deploys are skipped for forks by design, since they get no secrets. |
+
 ## Maintenance
 
 - Versions are pinned on purpose: `pnpm 12.3.4` and Node 24 in `package.json`,
@@ -185,3 +220,6 @@ would only risk Cloudflare mistaking this for a Workers project.
 - `pnpm/setup@v2` installs pnpm 11+ only. If you ever pin pnpm back to 10 or
   older, switch both workflows to `pnpm/action-setup@v6` plus
   `actions/setup-node`, because the successor action does not support pnpm 10.
+- Keep `wranglerVersion` in the deploy workflow and the `wrangler@4.131.0`
+  references in this document in step. Bumping one without the other makes the
+  docs describe a version nothing runs.

@@ -60,6 +60,11 @@ Cloudflare dashboard -> My Profile -> API Tokens -> Create Token -> Custom token
 Scope it to the one account and give it an expiry date. It does not need any
 Zone-level permission.
 
+Do **not** use the built-in "Edit Cloudflare Workers" template. It grants
+Workers permissions, not Pages ones, so `wrangler pages deploy` fails with an
+authentication error even though `wrangler whoami` may still look fine. The
+token has to be a custom token that includes Cloudflare Pages -> Edit.
+
 ### 3. Find your account ID
 
 Cloudflare dashboard -> Workers & Pages -> Overview. The Account ID is in the
@@ -131,7 +136,7 @@ You can also run the deploy workflow by hand from the Actions tab and choose
 
 ```sh
 pnpm run build                                   # Vite writes dist/
-wrangler pages deploy dist \
+pnpm exec wrangler pages deploy dist \
   --project-name=mlbb-draft-coach \
   --branch=main                                  # must match production branch
 ```
@@ -182,8 +187,9 @@ allowBuilds:
 ```
 
 pnpm 12 does not run a dependency's build scripts unless the package is approved
-here, and a skipped script is a hard error, not a warning. The deploy job
-installs wrangler, which pulls in both packages, so without this the job died on:
+here, and a skipped script is a hard error, not a warning. `wrangler` is a
+devDependency of this app, and it pulls in both packages, so without this the
+job died on:
 
 ```
 ERR_PNPM_IGNORED_BUILDS
@@ -191,8 +197,8 @@ ERR_PNPM_IGNORED_BUILDS
 ```
 
 Both need their `postinstall`: each ships its platform binary outside the npm
-tarball and downloads it there. Neither is a dependency of the app itself, which
-is why the approval sits beside the app rather than inside it.
+tarball and downloads it there. Neither is used by the app at runtime; they are
+there only because the wrangler CLI bundles them.
 
 Deleting this file will break the deploy job. So will removing either entry.
 
@@ -200,6 +206,8 @@ Deleting this file will break the deploy job. So will removing either entry.
 
 | Symptom | Cause |
 | --- | --- |
+| `In a non-interactive environment, it's necessary to set a CLOUDFLARE_API_TOKEN` | `CLOUDFLARE_API_TOKEN` is not set on the step. Check the secret exists and its name matches exactly. |
+| `You are not authenticated` | The token was sent but Cloudflare rejected it: wrong value, revoked, or expired. |
 | `ERR_PNPM_IGNORED_BUILDS` | A build script was not approved. Add the package to `allowBuilds` in `pnpm-workspace.yaml`. |
 | `The Pages project "x" does not exist.` | Project name mismatch. See step 5. Wrangler never creates the project for you in CI. |
 | `Authentication error` / `Unable to authenticate` | `CLOUDFLARE_API_TOKEN` is missing, expired, or lacks Account -> Cloudflare Pages -> Edit. |
@@ -208,10 +216,9 @@ Deleting this file will break the deploy job. So will removing either entry.
 
 ## Maintenance
 
-- Versions are pinned on purpose: `pnpm 12.3.4` and Node 24 in `package.json`,
-  wrangler `4.131.0` in the docs, `pnpm/setup@v2.1.0` and
-  `cloudflare/wrangler-action@v4.0.0` by commit SHA in the workflows. Bump them
-  deliberately, not by accident.
+- Versions are pinned on purpose: `pnpm 12.3.4`, Node 24 and wrangler `4.131.0`
+  in `package.json`, and `pnpm/setup@v2.1.0` by commit SHA in the workflows.
+  Bump them deliberately, not by accident.
 - `actions/*` use tags because GitHub owns those repositories; everything
   third-party is pinned to a full commit SHA, since a tag can be moved.
 - To require human approval before a production deploy, add a required reviewer
@@ -220,6 +227,12 @@ Deleting this file will break the deploy job. So will removing either entry.
 - `pnpm/setup@v2` installs pnpm 11+ only. If you ever pin pnpm back to 10 or
   older, switch both workflows to `pnpm/action-setup@v6` plus
   `actions/setup-node`, because the successor action does not support pnpm 10.
-- Keep `wranglerVersion` in the deploy workflow and the `wrangler@4.131.0`
-  references in this document in step. Bumping one without the other makes the
-  docs describe a version nothing runs.
+- Keep the `wrangler` devDependency and the `wrangler@4.131.0` references in
+  this document in step. Bumping one without the other makes the docs describe a
+  version nothing runs.
+- The deploy workflow calls `pnpm exec wrangler` directly instead of using
+  `cloudflare/wrangler-action`. The action runs wrangler internally and, when it
+  fails, reports only `The process '.../pnpm' failed with exit code 1`, hiding
+  wrangler's own error message. Calling wrangler directly puts the real error in
+  the log. Its "Verify credentials" step runs `wrangler whoami` first, so an
+  auth problem fails on its own step with a readable message.

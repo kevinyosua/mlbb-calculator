@@ -4,8 +4,17 @@
 #
 # Both packages need their postinstall step: esbuild and workerd download and
 # wire up the platform binary they ship separately from the npm tarball.
-# Neither is a dependency of this app. They arrive only when the deploy
-# workflow installs wrangler, which is why the approval lives here.
+# Neither is used by the app at runtime; they arrive because the wrangler CLI
+# (a devDependency) bundles them.
 allowBuilds:
   esbuild: true
   workerd: true
+minimumReleaseAgeExclude:
+  - '@cloudflare/workerd-darwin-64@1.20260910.1'
+  - '@cloudflare/workerd-darwin-arm64@1.20260910.1'
+  - '@cloudflare/workerd-linux-64@1.20260910.1'
+  - '@cloudflare/workerd-linux-arm64@1.20260910.1'
+  - '@cloudflare/workerd-windows-64@1.20260910.1'
+  - miniflare@5.20260910.0-alpha
+  - workerd@1.20260910.1
+  - wrangler@4.131.0

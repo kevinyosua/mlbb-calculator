@@ -12,11 +12,9 @@ on:
         options: [preview, production]
         default: preview
 
-# `contents: read` to check out the repo, `deployments: write` so the action
-# can record the deployment on the commit via GITHUB_TOKEN.
+# `contents: read` is all that is needed: nothing is written back to the repo.
 permissions:
   contents: read
-  deployments: write
 
 # Never run two deploys for the same ref at once.
 concurrency:
@@ -80,26 +78,28 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Verify credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler whoami
+
       - name: Deploy
-        id: deploy
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # Pinned, otherwise the action installs "wrangler@4" and drifts.
-          # Installing wrangler is why pnpm-workspace.yaml approves the esbuild
-          # and workerd build scripts.
-          wranglerVersion: 4.131.0
-          command: pages deploy dist --project-name=${{ env.PAGES_PROJECT }} --branch=${{ env.PAGES_BRANCH }}
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler pages deploy dist \
+            --project-name="$PAGES_PROJECT" \
+            --branch="$PAGES_BRANCH" | tee deploy-output.txt
 
       - name: Summary
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
-          ALIAS_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
+        if: always()
         run: |
-          echo "Preview: $DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"
-          echo "Alias:   $ALIAS_URL" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Preview deployment"
+            grep -oE 'https://[A-Za-z0-9.-]+\.pages\.dev' deploy-output.txt | sort -u || true
+          } >> "$GITHUB_STEP_SUMMARY"
 
   production:
     name: Production deploy
@@ -123,20 +123,27 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Verify credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler whoami
+
       # --branch must match the Pages project's production branch, otherwise
       # Cloudflare treats the upload as a preview deployment.
       - name: Deploy
-        id: deploy
-        uses: cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0 # v4.0.0
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: 4.131.0
-          command: pages deploy dist --project-name=${{ env.PAGES_PROJECT }} --branch=main
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          pnpm exec wrangler pages deploy dist \
+            --project-name="$PAGES_PROJECT" \
+            --branch=main | tee deploy-output.txt
 
       - name: Summary
-        env:
-          DEPLOYMENT_URL: ${{ steps.deploy.outputs.deployment-url }}
+        if: always()
         run: |
-          echo "Production: $DEPLOYMENT_URL" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Production deployment"
+            grep -oE 'https://[A-Za-z0-9.-]+\.pages\.dev' deploy-output.txt | sort -u || true
+          } >> "$GITHUB_STEP_SUMMARY"

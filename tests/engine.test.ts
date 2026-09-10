@@ -22,7 +22,10 @@ describe('engine', () => {
     expect(top3.some((h) => ['khufra', 'kaja', 'franco'].includes(h))).toBe(true);
   });
   it('meta override: kaja S beats khufra C despite lower raw counter', () => {
-    const meta = metaOf([['khufra', 4, 45], ['kaja', 10, 55]]);
+    const meta = metaOf([
+      ['khufra', 4, 45],
+      ['kaja', 10, 55],
+    ]);
     const recs = recommend({ ...base, allies: [], enemies: ['fanny'], meta });
     const rank = (id: string) => recs.findIndex((r) => r.hero === id);
     expect(rank('kaja')).toBeLessThan(rank('khufra'));

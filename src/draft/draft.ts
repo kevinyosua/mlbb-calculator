@@ -65,21 +65,33 @@ export interface BanOpts {
   weights: Weights;
 }
 
-// Empty draft: highest ban rate first — the ban column reads ban_rate, not pick rate.
+// Ban priority (0-100): tier sets the floor, ban_rate the crowd signal.
+// tier_score (2-10) is scaled x10 so both terms share the 0-100 range, then
+// blended 50/50. Keeps an S-tier ban above a merely high-ban-rate lower tier,
+// e.g. belerick (S, 59.37%) over eudora (A, 60.12%).
+const TIER_W = 0.5;
+const BAN_W = 0.5;
+export const banPriority = (byId: Map<string, MetaRow>, id: string): number => {
+  const m = byId.get(id);
+  if (!m) return 0;
+  return m.tier_score * 10 * TIER_W + m.ban_rate * BAN_W;
+};
+
+// Empty draft: highest ban priority first — the ban column reads tier + ban_rate.
 export function fallbackBans(heroes: Hero[], meta: MetaRow[], exclude: string[]): string[] {
   const out = new Set(exclude);
   const byId = metaById(meta);
   return [...heroes]
     .filter((h) => !out.has(h.id))
-    .sort((a, b) => (byId.get(b.id)?.ban_rate ?? 0) - (byId.get(a.id)?.ban_rate ?? 0))
+    .sort((a, b) => banPriority(byId, b.id) - banPriority(byId, a.id))
     .slice(0, 3)
     .map((h) => h.id);
 }
 
-// Ban list: ranked by ban percentage (primary). The mirrored draft — our picks
-// become the enemy's targets — only breaks ties between equal ban rates.
+// Ban list: ranked by ban priority (tier + ban rate). The mirrored draft — our
+// picks become the enemy's targets — only breaks ties between equal priorities.
 // Sorted over the whole pool, not a mirror-score shortlist, so a globally
-// high-ban hero is never dropped for scoring outside the top 10.
+// high-priority ban is never dropped for scoring outside the top 10.
 export function suggestBanIds(o: BanOpts): string[] {
   const exclude = [...o.allies, ...o.enemies, ...o.bans];
   if (o.allies.length === 0 && o.enemies.length === 0) return fallbackBans(o.heroes, o.meta, exclude);
@@ -98,11 +110,13 @@ export function suggestBanIds(o: BanOpts): string[] {
     limit: o.heroes.length,
   }))
     mirror.set(r.hero, r.score);
-  const banRate = (id: string) => byId.get(id)?.ban_rate ?? 0;
   const taken = new Set(exclude);
   return [...o.heroes]
     .filter((h) => !taken.has(h.id))
-    .sort((a, b) => banRate(b.id) - banRate(a.id) || (mirror.get(b.id) ?? 0) - (mirror.get(a.id) ?? 0))
+    .sort(
+      (a, b) =>
+        banPriority(byId, b.id) - banPriority(byId, a.id) || (mirror.get(b.id) ?? 0) - (mirror.get(a.id) ?? 0),
+    )
     .slice(0, 3)
     .map((h) => h.id);
 }

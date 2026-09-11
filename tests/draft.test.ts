@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { allyWarnings, fallbackBans, fallbackPicks, metaById, metaKey, rankList, suggestBanIds, suggestPickIds, teamWeakness } from '../src/draft/draft';
+import {
+  allyWarnings,
+  banPriority,
+  fallbackBans,
+  fallbackPicks,
+  metaById,
+  metaKey,
+  rankList,
+  suggestBanIds,
+  suggestPickIds,
+  teamWeakness,
+} from '../src/draft/draft';
 import type { CounterRel, Hero, MetaRow, PatchChange, Rec, SynergyRel, Weights } from '../src/engine/types';
 import countersJson from '../data/counters.json';
 import heroesJson from '../data/heroes.json';
@@ -76,11 +87,17 @@ describe('draft', () => {
     expect(suggestPickIds(['fanny'], scoreMap, heroes, meta, [])).toEqual([a.id, b.id, c.id]);
     expect(suggestPickIds([], scoreMap, heroes, meta, [])).toEqual(fallbackPicks(heroes, meta, []));
   });
-  it('fallbackBans top3 by ban rate desc, honors exclude', () => {
+  it('banPriority blends tier and ban rate (S tier beats A tier at equal ban)', () => {
+    const s = banPriority(byId, 'belerick'); // S, 59.37%
+    const a = banPriority(byId, 'eudora'); // A, 60.12%
+    expect(s).toBeGreaterThan(a);
+    expect(banPriority(byId, 'no-such-hero')).toBe(0);
+  });
+  it('fallbackBans top3 by ban priority desc, honors exclude', () => {
     const top = fallbackBans(heroes, meta, []);
     expect(top).toHaveLength(3);
-    const rate = (id: string) => byId.get(id)?.ban_rate ?? 0;
-    for (let i = 1; i < top.length; i++) expect(rate(top[i - 1])).toBeGreaterThanOrEqual(rate(top[i]));
+    for (let i = 1; i < top.length; i++)
+      expect(banPriority(byId, top[i - 1])).toBeGreaterThanOrEqual(banPriority(byId, top[i]));
     expect(fallbackBans(heroes, meta, [top[0]])).not.toContain(top[0]);
   });
   it('suggestBanIds falls back on empty draft, 3 bans otherwise', () => {
@@ -88,8 +105,8 @@ describe('draft', () => {
     expect(suggestBanIds(o)).toEqual(fallbackBans(heroes, meta, []));
     const bans = suggestBanIds({ ...o, enemies: ['fanny'] });
     expect(bans).toHaveLength(3);
-    const rate = (id: string) => byId.get(id)?.ban_rate ?? 0;
-    for (let i = 1; i < bans.length; i++) expect(rate(bans[i - 1])).toBeGreaterThanOrEqual(rate(bans[i]));
+    for (let i = 1; i < bans.length; i++)
+      expect(banPriority(byId, bans[i - 1])).toBeGreaterThanOrEqual(banPriority(byId, bans[i]));
     expect(bans).not.toContain('fanny');
   });
   it('allyWarnings finds anti-synergy both directions', () => {

@@ -88,3 +88,33 @@ export function compScore(
 export function finalScore(b: { counter: number; meta: number; comp: number; mastery: number }, w: Weights): number {
   return clamp(b.counter * w.counter + b.meta * w.meta + b.comp * w.comp + b.mastery * w.mastery);
 }
+
+// Draft rating: how good a drafted team is against the other side (0-100).
+// Same weights as recommend, mastery fixed at 50. Empty team -> 0.
+export function teamRating(
+  team: string[],
+  opp: string[],
+  pool: Hero[],
+  counters: CounterRel[],
+  syn: SynergyRel[],
+  meta: MetaRow[],
+  patches: PatchChange[],
+  w: Weights,
+): number {
+  if (team.length === 0) return 0;
+  const byId = new Map(pool.map((h) => [h.id, h] as const));
+  let total = 0;
+  let n = 0;
+  for (const id of team) {
+    const hero = byId.get(id);
+    if (!hero) continue;
+    const mates = team.filter((x) => x !== id);
+    const c = counterScore(id, opp, counters).score;
+    const m = metaScore(id, meta, patches);
+    const cp = compScore(hero, mates, opp, pool, counters, syn).score;
+    total += finalScore({ counter: c, meta: m, comp: cp, mastery: 50 }, w);
+    n++;
+  }
+  if (n === 0) return 0;
+  return Math.round((total / n) * 10) / 10;
+}

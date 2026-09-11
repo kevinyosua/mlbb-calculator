@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { recommend } from '../src/engine/recommend';
+import { teamRating } from '../src/engine/score';
 import type { CounterRel, Hero, MetaRow, PatchChange } from '../src/engine/types';
 import countersJson from '../data/counters.json';
 import heroesJson from '../data/heroes.json';
@@ -50,5 +51,11 @@ describe('engine', () => {
       expect(r.score).toBeGreaterThanOrEqual(0);
       expect(r.score).toBeLessThanOrEqual(100);
     }
+  });
+  it('teamRating: empty team 0, rated team 0-100', () => {
+    expect(teamRating([], ['fanny'], heroes, counters, syn, [], noPatch, weights)).toBe(0);
+    const r = teamRating(['khufra', 'tigreal'], ['fanny'], heroes, counters, syn, [], noPatch, weights);
+    expect(r).toBeGreaterThanOrEqual(0);
+    expect(r).toBeLessThanOrEqual(100);
   });
 });

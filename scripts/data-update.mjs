@@ -11,8 +11,17 @@ import { cacheIcons } from './cache-icons.mjs';
 
 const API = 'https://mlbbhub.com/api/stats';
 
+function readJson(p) {
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch {
+    process.stderr.write(`gagal baca ${p}\n`);
+    process.exit(1);
+  }
+}
+
 const patch = process.argv[2] ?? '2.1.95a';
-const heroes = JSON.parse(fs.readFileSync('./data/heroes.json', 'utf8'));
+const heroes = readJson('./data/heroes.json');
 const have = new Set(heroes.map((h) => h.id));
 
 const res = await fetchWithUA(API);
@@ -82,8 +91,8 @@ for (const h of heroes) {
 }
 fs.writeFileSync('./data/meta.json', JSON.stringify(rows));
 
-console.log(`heroes: ${heroes.length} (+${added} baru, ikon ${iconOk}) patch: ${patch}`);
-console.log('scrape gagal:', fail.join(',') || 'none');
-console.log('slug ditolak (bukan pola slug):', rejected.join(',') || 'none');
-console.log(`meta rows: ${rows.length}`);
-console.log('tanpa meta (fallback 50):', noMeta.join(',') || 'none');
+process.stdout.write(`heroes: ${heroes.length} (+${added} baru, ikon ${iconOk}) patch: ${patch}\n`);
+process.stdout.write(`scrape gagal: ${fail.join(',') || 'none'}\n`);
+process.stdout.write(`slug ditolak (bukan pola slug): ${rejected.join(',') || 'none'}\n`);
+process.stdout.write(`meta rows: ${rows.length}\n`);
+process.stdout.write(`tanpa meta (fallback 50): ${noMeta.join(',') || 'none'}\n`);

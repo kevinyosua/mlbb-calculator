@@ -8,9 +8,18 @@ import { fetchWithUA } from './http.mjs';
 // Hand-written rows win conflicts (the M1 seed data is preserved).
 // Patch label comes from the argument, default 2.1.95a.
 
+function readJson(p) {
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch {
+    process.stderr.write(`gagal baca ${p}\n`);
+    process.exit(1);
+  }
+}
+
 const patch = process.argv[2] ?? '2.1.95a';
-const heroes = JSON.parse(fs.readFileSync('./data/heroes.json', 'utf8'));
-const manual = JSON.parse(fs.readFileSync('./data/counters.json', 'utf8'));
+const heroes = readJson('./data/heroes.json');
+const manual = readJson('./data/counters.json');
 const manualKey = new Set(manual.map((c) => `${c.source}>${c.target}:${c.type}`));
 
 // Guard: scraped ids only enter the dataset when they name a known hero.
@@ -82,7 +91,7 @@ for (const h of heroes) {
 }
 // Guard: drop invalid rows before writing (never poison the data).
 const clean = rows.filter(isValidCounter);
-console.log(`drop invalid: ${rows.length - clean.length}`);
+process.stdout.write(`drop invalid: ${rows.length - clean.length}\n`);
 fs.writeFileSync('./data/counters.json', JSON.stringify(clean));
-console.log(`rows: ${rows.length} (manual ${manual.length} + proven ${prov} + strong-against ${sa}, skip-konflik ${skipped})`);
-console.log('gagal/tanpa-halaman:', fail.join(',') || 'none');
+process.stdout.write(`rows: ${rows.length} (manual ${manual.length} + proven ${prov} + strong-against ${sa}, skip-konflik ${skipped})\n`);
+process.stdout.write(`gagal/tanpa-halaman: ${fail.join(',') || 'none'}\n`);

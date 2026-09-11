@@ -15,9 +15,22 @@ const DATA_FILE = './data/heroes.json';
 const isWebp = (buf) =>
   buf.length > 12 && buf.subarray(0, 4).toString('latin1') === 'RIFF' && buf.subarray(8, 12).toString('latin1') === 'WEBP';
 
-export async function cacheIcons({ only = [], dir = ICON_DIR, file = DATA_FILE, log = console.log } = {}) {
+const stdoutLog = (...a) =>
+  process.stdout.write(`${a.join(' ')}
+`);
+
+function readJson(p) {
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch {
+    process.stderr.write(`gagal baca ${p}\n`);
+    process.exit(1);
+  }
+}
+
+export async function cacheIcons({ only = [], dir = ICON_DIR, file = DATA_FILE, log = stdoutLog } = {}) {
   const requested = new Set(only);
-  const heroes = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const heroes = readJson(file);
   const base = path.resolve(dir);
   fs.mkdirSync(base, { recursive: true });
 

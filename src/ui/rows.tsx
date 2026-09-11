@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, type CSSProperties } from 'react';
 import { Avatar } from './avatar';
 import type { Hero, MetaRow, Rec } from '../engine/types';
 import type { Lang } from '../i18n';
@@ -114,6 +114,108 @@ interface HeroRowsProps {
   onAdd: (side: Side, id: string) => void;
 }
 
+interface HeroRowProps {
+  h: Hero;
+  i: number;
+  where: Side | null;
+  full: (s: Side) => boolean;
+  expanded: boolean;
+  rec: Rec | undefined;
+  mt: string | undefined;
+  m: MetaRow | undefined;
+  heroes: Hero[];
+  meta: MetaRow[];
+  lang: Lang;
+  showScore: boolean;
+  labels: HeroRowsProps['labels'];
+  onToggle: () => void;
+  onAdd: (s: Side, id: string) => void;
+}
+
+function HeroRow(p: HeroRowProps) {
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const wasExpanded = useRef(p.expanded);
+  // Unfold list: keep action buttons clear of the sticky filter bar.
+  useEffect(() => {
+    if (p.expanded && !wasExpanded.current) actionsRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    wasExpanded.current = p.expanded;
+  }, [p.expanded]);
+  const { h, i, where, rec, mt, m } = p;
+  const act = (s: Side, label: string) => (
+    <button type="button" key={s} onClick={() => p.onAdd(s, h.id)} disabled={where === s || (!where && p.full(s))} className="mdc-act">
+      {label}
+      {where === s ? ' ✓' : ''}
+    </button>
+  );
+  // ponytail: bar width dynamic per score — keep CSS var, switch to attr() when supported.
+  const bar = { '--bar': `${Math.round(rec?.score ?? 0)}%` } as CSSProperties;
+  return (
+    <div className="mdc-card mdc-rowcard">
+      <button type="button" className="mdc-press mdc-rowbtn" onClick={p.onToggle} aria-expanded={p.expanded}>
+        <Avatar id={h.id} heroes={p.heroes} meta={p.meta} lang={p.lang} size={30} />
+        <span className="mdc-uname">
+          <b>
+            #{i + 1} {h.name}
+          </b>{' '}
+          {mt ? (
+            <span className={`mdc-chip mdc-tier${mt}`} title={`Tier ${mt}: ${TIER_INFO[p.lang][mt]}`}>
+              {mt}
+            </span>
+          ) : null}{' '}
+          <span className="mdc-chip">{h.lane}</span> <span className="mdc-muted">{h.roles.join('/')}</span>
+          <br />
+          <span className="mdc-muted">{m ? `${m.win_rate}% WR · ${m.pick_rate}% pick` : 'no meta'}</span>
+        </span>
+        {p.showScore && rec ? <b className="mdc-goldnum mdc-bignum">{rec.score}</b> : null}
+        <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" className="mdc-chev">
+          <path
+            d={p.expanded ? 'M2 8l4-4 4 4' : 'M2 4l4 4 4-4'}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
+      {p.showScore && rec ? (
+        <div
+          className="mdc-score mdc-mt6"
+          role="progressbar"
+          aria-valuenow={Math.round(rec.score)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${h.name} score`}
+        >
+          <i className="mdc-bar" style={bar} />
+        </div>
+      ) : null}
+      {p.expanded && (
+        <>
+          {rec && rec.reasons.length > 0 && (
+            <ul className="mdc-reasons">
+              {[...new Set(rec.reasons)].map((x: string) => (
+                <li key={x}>{x}</li>
+              ))}
+            </ul>
+          )}
+          {rec && (
+            <div className="mdc-muted mdc-mt4">
+              counter {Math.round(rec.breakdown.counter)} · meta {Math.round(rec.breakdown.meta)} · comp {Math.round(rec.breakdown.comp)} ·
+              mastery {Math.round(rec.breakdown.mastery)}
+            </div>
+          )}
+          <div className="mdc-actions" ref={actionsRef}>
+            {act('ally', p.labels.addAlly)}
+            {act('enemy', p.labels.addEnemy)}
+            {act('ourBan', p.labels.addOurBan)}
+            {act('enemyBan', p.labels.addEnemyBan)}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function HeroRows(p: HeroRowsProps) {
   return (
     <section className="mdc-col8" aria-label="hero list">
@@ -135,82 +237,25 @@ export function HeroRows(p: HeroRowsProps) {
               : s === 'ourBan'
                 ? p.ourBans.length >= p.max
                 : p.enemyBans.length >= p.max;
-        const act = (s: Side, label: string) => (
-          <button type="button" key={s} onClick={() => p.onAdd(s, h.id)} disabled={where === s || (!where && full(s))} className="mdc-act">
-            {label}
-            {where === s ? ' ✓' : ''}
-          </button>
-        );
-        const expanded = p.openHero === h.id;
-        const rec = p.scoreMap.get(h.id);
-        // ponytail: bar width dynamic per score — keep CSS var, switch to attr() when supported.
-        const bar = { '--bar': `${Math.round(rec?.score ?? 0)}%` } as CSSProperties;
-        const mt = p.metaById.get(h.id)?.tier;
-        const m = p.metaById.get(h.id);
         return (
-          <div key={h.id} className="mdc-card mdc-rowcard">
-            <button type="button" className="mdc-press mdc-rowbtn" onClick={() => p.onToggle(h.id)} aria-expanded={expanded}>
-              <Avatar id={h.id} heroes={p.heroes} meta={p.meta} lang={p.lang} size={30} />
-              <span className="mdc-uname">
-                <b>
-                  #{i + 1} {h.name}
-                </b>{' '}
-                {mt ? (
-                  <span className={`mdc-chip mdc-tier${mt}`} title={`Tier ${mt}: ${TIER_INFO[p.lang][mt]}`}>
-                    {mt}
-                  </span>
-                ) : null}{' '}
-                <span className="mdc-chip">{h.lane}</span> <span className="mdc-muted">{h.roles.join('/')}</span>
-                <br />
-                <span className="mdc-muted">{m ? `${m.win_rate}% WR · ${m.pick_rate}% pick` : 'no meta'}</span>
-              </span>
-              {p.showScore && rec ? <b className="mdc-goldnum mdc-bignum">{rec.score}</b> : null}
-              <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" className="mdc-chev">
-                <path
-                  d={expanded ? 'M2 8l4-4 4 4' : 'M2 4l4 4 4-4'}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-            {p.showScore && rec ? (
-              <div
-                className="mdc-score mdc-mt6"
-                role="progressbar"
-                aria-valuenow={Math.round(rec.score)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-label={`${h.name} score`}
-              >
-                <i className="mdc-bar" style={bar} />
-              </div>
-            ) : null}
-            {expanded && (
-              <>
-                {rec && rec.reasons.length > 0 && (
-                  <ul className="mdc-reasons">
-                    {[...new Set(rec.reasons)].map((x: string) => (
-                      <li key={x}>{x}</li>
-                    ))}
-                  </ul>
-                )}
-                {rec && (
-                  <div className="mdc-muted mdc-mt4">
-                    counter {Math.round(rec.breakdown.counter)} · meta {Math.round(rec.breakdown.meta)} · comp{' '}
-                    {Math.round(rec.breakdown.comp)} · mastery {Math.round(rec.breakdown.mastery)}
-                  </div>
-                )}
-                <div className="mdc-actions">
-                  {act('ally', p.labels.addAlly)}
-                  {act('enemy', p.labels.addEnemy)}
-                  {act('ourBan', p.labels.addOurBan)}
-                  {act('enemyBan', p.labels.addEnemyBan)}
-                </div>
-              </>
-            )}
-          </div>
+          <HeroRow
+            key={h.id}
+            h={h}
+            i={i}
+            where={where}
+            full={full}
+            expanded={p.openHero === h.id}
+            rec={p.scoreMap.get(h.id)}
+            mt={p.metaById.get(h.id)?.tier}
+            m={p.metaById.get(h.id)}
+            heroes={p.heroes}
+            meta={p.meta}
+            lang={p.lang}
+            showScore={p.showScore}
+            labels={p.labels}
+            onToggle={() => p.onToggle(h.id)}
+            onAdd={p.onAdd}
+          />
         );
       })}
     </section>

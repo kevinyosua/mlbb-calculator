@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { Lang } from '../i18n';
 import { ALL_LANE, ALL_ROLE } from './theme';
 
@@ -24,9 +24,25 @@ interface FilterProps {
 }
 
 export function FilterBar(p: FilterProps) {
+  const rootRef = useRef<HTMLElement>(null);
+  // Keep scroll padding in sync with the sticky bar height (auto-scroll clears it).
+  useEffect(() => {
+    const set = () => {
+      const h = rootRef.current?.offsetHeight ?? 0;
+      document.documentElement.style.setProperty('--mdc-scroll-pad', `${h}px`);
+    };
+    set();
+    const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(set);
+    if (ro && rootRef.current) ro.observe(rootRef.current);
+    window.addEventListener('resize', set);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', set);
+    };
+  }, []);
   if (!p.open)
     return (
-      <div className="mdc-filter-closed">
+      <div className="mdc-filter-closed" ref={rootRef as RefObject<HTMLDivElement>}>
         <button
           type="button"
           onClick={p.onOpen}
@@ -45,7 +61,7 @@ export function FilterBar(p: FilterProps) {
       </div>
     );
   return (
-    <section id="mdc-filter" aria-label={p.labels.filters} className="mdc-filterbar">
+    <section id="mdc-filter" ref={rootRef as RefObject<HTMLElement>} aria-label={p.labels.filters} className="mdc-filterbar">
       <div className="mdc-row mdc-frow">
         <label className="mdc-sr" htmlFor="mdc-q">
           {p.labels.search}

@@ -22,7 +22,8 @@
 }
 
 html {
-  scroll-padding-bottom: 320px;
+  --mdc-scroll-pad: 120px;
+  scroll-padding-bottom: calc(var(--mdc-scroll-pad) + env(safe-area-inset-bottom));
 }
 
 body {

@@ -65,26 +65,46 @@ export interface BanOpts {
   weights: Weights;
 }
 
-// Bans answer the mirrored draft (our picks as their enemies), ban_rate breaks ties.
+// Empty draft: highest ban rate first — the ban column reads ban_rate, not pick rate.
+export function fallbackBans(heroes: Hero[], meta: MetaRow[], exclude: string[]): string[] {
+  const out = new Set(exclude);
+  const byId = metaById(meta);
+  return [...heroes]
+    .filter((h) => !out.has(h.id))
+    .sort((a, b) => (byId.get(b.id)?.ban_rate ?? 0) - (byId.get(a.id)?.ban_rate ?? 0))
+    .slice(0, 3)
+    .map((h) => h.id);
+}
+
+// Ban list: ranked by ban percentage (primary). The mirrored draft — our picks
+// become the enemy's targets — only breaks ties between equal ban rates.
+// Sorted over the whole pool, not a mirror-score shortlist, so a globally
+// high-ban hero is never dropped for scoring outside the top 10.
 export function suggestBanIds(o: BanOpts): string[] {
-  if (o.allies.length === 0 && o.enemies.length === 0) return fallbackPicks(o.heroes, o.meta, [...o.allies, ...o.enemies, ...o.bans]);
-  const r = recommend({
+  const exclude = [...o.allies, ...o.enemies, ...o.bans];
+  if (o.allies.length === 0 && o.enemies.length === 0) return fallbackBans(o.heroes, o.meta, exclude);
+  const byId = metaById(o.meta);
+  const mirror = new Map<string, number>();
+  for (const r of recommend({
     allies: o.enemies,
     enemies: o.allies,
-    bans: [...o.allies, ...o.enemies, ...o.bans],
+    bans: exclude,
     pool: o.heroes,
     counters: o.counters,
     syn: o.syn,
     meta: o.meta,
     patches: o.patches,
     weights: o.weights,
-    limit: 10,
-  });
-  const byId = metaById(o.meta);
-  return [...r]
-    .sort((a, b) => b.score + (byId.get(b.hero)?.ban_rate ?? 0) - (a.score + (byId.get(a.hero)?.ban_rate ?? 0)))
+    limit: o.heroes.length,
+  }))
+    mirror.set(r.hero, r.score);
+  const banRate = (id: string) => byId.get(id)?.ban_rate ?? 0;
+  const taken = new Set(exclude);
+  return [...o.heroes]
+    .filter((h) => !taken.has(h.id))
+    .sort((a, b) => banRate(b.id) - banRate(a.id) || (mirror.get(b.id) ?? 0) - (mirror.get(a.id) ?? 0))
     .slice(0, 3)
-    .map((x) => x.hero);
+    .map((h) => h.id);
 }
 
 export function suggestPickIds(

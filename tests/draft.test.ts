@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allyWarnings, fallbackPicks, metaById, metaKey, rankList, suggestBanIds, suggestPickIds, teamWeakness } from '../src/draft/draft';
+import { allyWarnings, fallbackBans, fallbackPicks, metaById, metaKey, rankList, suggestBanIds, suggestPickIds, teamWeakness } from '../src/draft/draft';
 import type { CounterRel, Hero, MetaRow, PatchChange, Rec, SynergyRel, Weights } from '../src/engine/types';
 import countersJson from '../data/counters.json';
 import heroesJson from '../data/heroes.json';
@@ -76,10 +76,21 @@ describe('draft', () => {
     expect(suggestPickIds(['fanny'], scoreMap, heroes, meta, [])).toEqual([a.id, b.id, c.id]);
     expect(suggestPickIds([], scoreMap, heroes, meta, [])).toEqual(fallbackPicks(heroes, meta, []));
   });
+  it('fallbackBans top3 by ban rate desc, honors exclude', () => {
+    const top = fallbackBans(heroes, meta, []);
+    expect(top).toHaveLength(3);
+    const rate = (id: string) => byId.get(id)?.ban_rate ?? 0;
+    for (let i = 1; i < top.length; i++) expect(rate(top[i - 1])).toBeGreaterThanOrEqual(rate(top[i]));
+    expect(fallbackBans(heroes, meta, [top[0]])).not.toContain(top[0]);
+  });
   it('suggestBanIds falls back on empty draft, 3 bans otherwise', () => {
     const o = { allies: [], enemies: [], bans: [], heroes, counters, syn, meta, patches, weights };
-    expect(suggestBanIds(o)).toEqual(fallbackPicks(heroes, meta, []));
-    expect(suggestBanIds({ ...o, enemies: ['fanny'] })).toHaveLength(3);
+    expect(suggestBanIds(o)).toEqual(fallbackBans(heroes, meta, []));
+    const bans = suggestBanIds({ ...o, enemies: ['fanny'] });
+    expect(bans).toHaveLength(3);
+    const rate = (id: string) => byId.get(id)?.ban_rate ?? 0;
+    for (let i = 1; i < bans.length; i++) expect(rate(bans[i - 1])).toBeGreaterThanOrEqual(rate(bans[i]));
+    expect(bans).not.toContain('fanny');
   });
   it('allyWarnings finds anti-synergy both directions', () => {
     const s = [

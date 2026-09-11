@@ -96,8 +96,7 @@ describe('draft', () => {
   it('fallbackBans top3 by ban priority desc, honors exclude', () => {
     const top = fallbackBans(heroes, meta, []);
     expect(top).toHaveLength(3);
-    for (let i = 1; i < top.length; i++)
-      expect(banPriority(byId, top[i - 1])).toBeGreaterThanOrEqual(banPriority(byId, top[i]));
+    for (let i = 1; i < top.length; i++) expect(banPriority(byId, top[i - 1])).toBeGreaterThanOrEqual(banPriority(byId, top[i]));
     expect(fallbackBans(heroes, meta, [top[0]])).not.toContain(top[0]);
   });
   it('suggestBanIds falls back on empty draft, 3 bans otherwise', () => {
@@ -105,8 +104,7 @@ describe('draft', () => {
     expect(suggestBanIds(o)).toEqual(fallbackBans(heroes, meta, []));
     const bans = suggestBanIds({ ...o, enemies: ['fanny'] });
     expect(bans).toHaveLength(3);
-    for (let i = 1; i < bans.length; i++)
-      expect(banPriority(byId, bans[i - 1])).toBeGreaterThanOrEqual(banPriority(byId, bans[i]));
+    for (let i = 1; i < bans.length; i++) expect(banPriority(byId, bans[i - 1])).toBeGreaterThanOrEqual(banPriority(byId, bans[i]));
     expect(bans).not.toContain('fanny');
   });
   it('allyWarnings finds anti-synergy both directions', () => {

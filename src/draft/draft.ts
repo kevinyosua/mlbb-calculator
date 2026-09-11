@@ -113,10 +113,7 @@ export function suggestBanIds(o: BanOpts): string[] {
   const taken = new Set(exclude);
   return [...o.heroes]
     .filter((h) => !taken.has(h.id))
-    .sort(
-      (a, b) =>
-        banPriority(byId, b.id) - banPriority(byId, a.id) || (mirror.get(b.id) ?? 0) - (mirror.get(a.id) ?? 0),
-    )
+    .sort((a, b) => banPriority(byId, b.id) - banPriority(byId, a.id) || (mirror.get(b.id) ?? 0) - (mirror.get(a.id) ?? 0))
     .slice(0, 3)
     .map((h) => h.id);
 }

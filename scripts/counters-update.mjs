@@ -4,7 +4,9 @@ import { fetchWithUA } from './http.mjs';
 
 // pnpm counters:update [patch] — pull /counter/<slug> from mlbbhub for every hero.
 // Proven counters (measured +pp) -> COUNTER (score = min(10, round(5 + pp))).
-// Strong-against -> COUNTERED_BY (score 6).
+// Strong-against -> COUNTERED_BY, victim-first (source = hero that loses,
+// target = hero that wins) to match hand-written rows, e.g. page franco
+// listing fanny becomes {source: fanny, target: franco} — franco beats fanny.
 // Hand-written rows win conflicts (the M1 seed data is preserved).
 // Patch label comes from the argument, default 2.1.95a.
 
@@ -66,18 +68,18 @@ for (const h of heroes) {
       const targets = [...sSec.matchAll(/href="\/counter\/([a-z0-9-]+)"/g)].map((m) => m[1]);
       for (const t of targets) {
         if (!isKnownHero(t)) continue;
-        const key = `${slug}>${t}:COUNTERED_BY`;
+        const key = `${t}>${slug}:COUNTERED_BY`;
         if (manualKey.has(key)) {
           skipped++;
           continue;
         }
         rows.push({
-          source: slug,
-          target: t,
+          source: t,
+          target: slug,
           type: 'COUNTERED_BY',
           score: 6,
           tags: ['measured'],
-          reason: `${h.name} kuat lawan ${t} (mlbbhub strong-against). Hindari pick ${t}.`,
+          reason: `${t} lemah lawan ${h.name} (mlbbhub strong-against). Hindari pick ${t}.`,
           sources: [`https://mlbbhub.com/counter/${slug}`],
           patch_verified: patch,
         });

@@ -2,19 +2,51 @@ import type { CounterRel, Hero, MetaRow, PatchChange, SynergyRel, Weights } from
 
 export const clamp = (n: number, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, n));
 
-export function counterScore(heroId: string, enemies: string[], counters: CounterRel[]): { score: number; reasons: string[] } {
-  if (enemies.length === 0) return { score: 0, reasons: [] };
-  const hits = counters.filter((c) => c.source === heroId && c.type === 'COUNTER' && enemies.includes(c.target));
-  if (hits.length === 0) return { score: 0, reasons: [] };
-  const covered = new Set(hits.map((h) => h.target));
+export function counterScore(
+  heroId: string,
+  enemies: string[],
+  counters: CounterRel[],
+): { score: number; reasons: string[]; counters: string[] } {
+  if (enemies.length === 0) return { score: 0, reasons: [], counters: [] };
+  // COUNTER: source beats target. COUNTERED_BY: source loses to target
+  // (victim-first, matches hand-written rows). Both forms count when the
+  // candidate beats the enemy.
+  const hits = counters.filter(
+    (c) =>
+      (c.type === 'COUNTER' && c.source === heroId && enemies.includes(c.target)) ||
+      (c.type === 'COUNTERED_BY' && c.target === heroId && enemies.includes(c.source)),
+  );
+  if (hits.length === 0) return { score: 0, reasons: [], counters: [] };
+  const best = new Map<string, number>();
+  for (const h of hits) {
+    const enemy = h.type === 'COUNTER' ? h.target : h.source;
+    const prev = best.get(enemy) ?? -1;
+    if (h.score > prev) best.set(enemy, h.score);
+  }
+  const covered = [...best.entries()].sort((a, b) => b[1] - a[1]).map(([e]) => e);
   const avg = hits.reduce((s, h) => s + h.score, 0) / hits.length;
-  const coverage = covered.size / enemies.length;
+  const coverage = covered.length / enemies.length;
   const score = clamp(avg * 10 * (0.6 + 0.4 * coverage));
   const reasons = [...hits]
     .sort((a, b) => b.score - a.score)
     .slice(0, 3)
     .map((h) => h.reason);
-  return { score, reasons };
+  return { score, reasons, counters: covered };
+}
+
+export function synergyScore(heroId: string, allies: string[], syn: SynergyRel[]): { score: number; allies: string[] } {
+  if (allies.length === 0) return { score: 0, allies: [] };
+  const best = new Map<string, number>();
+  for (const a of allies) {
+    const hit = syn.find(
+      (x) => x.type === 'SYNERGY' && ((x.source === heroId && x.target === a) || (x.source === a && x.target === heroId)),
+    );
+    if (hit) best.set(a, hit.score);
+  }
+  if (best.size === 0) return { score: 0, allies: [] };
+  const matched = [...best.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  const avg = matched.reduce((s, id) => s + (best.get(id) ?? 0), 0) / matched.length;
+  return { score: clamp(avg * 10), allies: matched };
 }
 
 export function metaScore(heroId: string, meta: MetaRow[], patches: PatchChange[]): number {

@@ -22,6 +22,14 @@ describe('engine', () => {
     const top3 = recs.slice(0, 3).map((r) => r.hero);
     expect(top3.some((h) => ['khufra', 'kaja', 'franco'].includes(h))).toBe(true);
   });
+  it('COUNTERED_BY counts too: victim pick tags its threat', () => {
+    const cb: CounterRel[] = [
+      { source: 'fanny', target: 'miya', type: 'COUNTERED_BY', score: 8, tags: ['x'], reason: 'r', sources: ['u'], patch_verified: 'p' },
+    ];
+    const recs = recommend({ ...base, counters: cb, allies: [], enemies: ['fanny'] });
+    expect(recs[0].hero).toBe('miya');
+    expect(recs[0].counters).toEqual(['fanny']);
+  });
   it('meta override: kaja S beats khufra C despite lower raw counter', () => {
     const meta = metaOf([
       ['khufra', 4, 45],

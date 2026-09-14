@@ -81,4 +81,6 @@ export interface Rec {
   score: number;
   reasons: string[];
   breakdown: Breakdown;
+  counters: string[];
+  allies: string[];
 }

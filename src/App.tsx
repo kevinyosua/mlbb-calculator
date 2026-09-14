@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { loadAll, type GameData } from './data/load';
 import { allyWarnings as allyWarns, metaById as makeMetaById, rankList, suggestBanIds, suggestPickIds, teamWeakness } from './draft/draft';
 import { recommend } from './engine/recommend';
-import { teamRating } from './engine/score';
+import { synergyScore, teamRating } from './engine/score';
 import type { Rec } from './engine/types';
 import { STR, type Lang } from './i18n';
 import { reportError, useLastError } from './ui/errors';
@@ -49,22 +49,44 @@ export default function App() {
   const roles = [ALL_ROLE, ...new Set(data.heroes.flatMap((h) => h.roles))];
   const metaById = useMemo(() => makeMetaById(data.meta), []);
   // Skor tiap hero lawan musuh. Satu sumber urutan list + kotak suggest.
+  // Allies-only draft (no enemy yet) -> synergy-only rec map so list still
+  // ranks by synergy count and shows ✦ badges.
   const scoreMap = useMemo(() => {
     try {
-      if (enemies.length === 0 || data.heroes.length === 0) return new Map<string, Rec>();
-      const recs = recommend({
-        allies,
-        enemies,
-        bans,
-        pool: data.heroes,
-        counters: data.counters,
-        syn: data.syn,
-        meta: data.meta,
-        patches: data.patches,
-        weights: data.weights,
-        limit: data.heroes.length,
-      });
-      return new Map(recs.map((r) => [r.hero, r]));
+      if (data.heroes.length === 0) return new Map<string, Rec>();
+      if (enemies.length > 0) {
+        const recs = recommend({
+          allies,
+          enemies,
+          bans,
+          pool: data.heroes,
+          counters: data.counters,
+          syn: data.syn,
+          meta: data.meta,
+          patches: data.patches,
+          weights: data.weights,
+          limit: data.heroes.length,
+        });
+        return new Map(recs.map((r) => [r.hero, r]));
+      }
+      if (allies.length > 0) {
+        const pickedSet = new Set([...allies, ...bans]);
+        const map = new Map<string, Rec>();
+        for (const h of data.heroes) {
+          if (pickedSet.has(h.id)) continue;
+          const { allies: mates, score } = synergyScore(h.id, allies, data.syn);
+          map.set(h.id, {
+            hero: h.id,
+            score,
+            reasons: [],
+            breakdown: { counter: 0, meta: 0, comp: 0, mastery: 0 },
+            counters: [],
+            allies: mates,
+          });
+        }
+        return map;
+      }
+      return new Map<string, Rec>();
     } catch {
       reportError('rec');
       return new Map<string, Rec>();
@@ -144,7 +166,7 @@ export default function App() {
     [allies, enemies, bans],
   );
   const pickSug = useMemo(
-    () => suggestPickIds(enemies, scoreMap, data.heroes, data.meta, [...allies, ...enemies, ...bans]),
+    () => suggestPickIds(allies, enemies, scoreMap, data.heroes, data.meta, [...allies, ...enemies, ...bans], data.syn),
     [enemies, scoreMap, allies, bans],
   );
   // Rating draft ally vs enemy (0-100). Lihat teamRating di engine/score.

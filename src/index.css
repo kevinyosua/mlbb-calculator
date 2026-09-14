@@ -380,6 +380,33 @@ select {
   flex: 1;
   font-size: 13px;
 }
+.mdc-counters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.mdc-counter {
+  color: var(--gold);
+  border-color: var(--goldline);
+}
+.mdc-inline-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.mdc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.mdc-synergy {
+  color: #6ee7b7;
+  border-color: rgba(110, 231, 183, 0.4);
+}
 .mdc-rowcard {
   padding: 6px;
 }

@@ -1,12 +1,13 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
 import { Avatar } from './avatar';
+import type { SuggestItem } from '../draft/draft';
 import type { Hero, MetaRow, Rec } from '../engine/types';
 import type { Lang } from '../i18n';
 import { TIER_INFO, TIER_RING, type Side } from './theme';
 
 interface SuggestPairProps {
-  pickSug: string[];
-  banSug: string[];
+  pickSug: SuggestItem[];
+  banSug: SuggestItem[];
   heroes: Hero[];
   meta: MetaRow[];
   lang: Lang;
@@ -16,14 +17,14 @@ interface SuggestPairProps {
 }
 
 function SuggestCol({
-  ids,
+  items,
   heroes,
   meta,
   lang,
   rate,
   onPick,
 }: {
-  ids: string[];
+  items: SuggestItem[];
   heroes: Hero[];
   meta: MetaRow[];
   lang: Lang;
@@ -31,9 +32,10 @@ function SuggestCol({
   onPick: (id: string) => void;
 }) {
   const word = rate === 'pick_rate' ? 'pick' : 'ban';
+  const nameOf = (id: string) => heroes.find((x) => x.id === id)?.name ?? id;
   return (
     <div className="mdc-col8">
-      {ids.map((id) => {
+      {items.map(({ id, counters, allies, lane }) => {
         const h = heroes.find((x) => x.id === id);
         if (!h) return null;
         const m = meta.find((x) => x.hero === id);
@@ -47,7 +49,7 @@ function SuggestCol({
           >
             <Avatar id={id} heroes={heroes} meta={meta} lang={lang} size={28} />
             <span className="mdc-sub">
-              {h.name}
+              {h.name} {lane ? <span className="mdc-chip">{lane}</span> : null}
               <br />
               <span className="mdc-muted">
                 {m ? (
@@ -58,6 +60,30 @@ function SuggestCol({
                   ''
                 )}
               </span>
+              {(counters?.length ?? 0) > 0 && (
+                <>
+                  <br />
+                  <span className="mdc-counters">
+                    {(counters ?? []).map((c) => (
+                      <span key={c} className="mdc-chip mdc-counter" title={`Counters ${nameOf(c)}`}>
+                        ⚔ {nameOf(c)}
+                      </span>
+                    ))}
+                  </span>
+                </>
+              )}
+              {(allies?.length ?? 0) > 0 && (
+                <>
+                  <br />
+                  <span className="mdc-counters">
+                    {(allies ?? []).map((a) => (
+                      <span key={a} className="mdc-chip mdc-synergy" title={`Synergy with ${nameOf(a)}`}>
+                        ✦ {nameOf(a)}
+                      </span>
+                    ))}
+                  </span>
+                </>
+              )}
             </span>
           </button>
         );
@@ -72,11 +98,11 @@ export function SuggestPair(p: SuggestPairProps) {
       <div className="mdc-grid2">
         <div>
           <p className="mdc-title">{p.titles.picks}</p>
-          <SuggestCol ids={p.pickSug} heroes={p.heroes} meta={p.meta} lang={p.lang} rate="pick_rate" onPick={p.onPick} />
+          <SuggestCol items={p.pickSug} heroes={p.heroes} meta={p.meta} lang={p.lang} rate="pick_rate" onPick={p.onPick} />
         </div>
         <div>
           <p className="mdc-title mdc-title-red">{p.titles.bans}</p>
-          <SuggestCol ids={p.banSug} heroes={p.heroes} meta={p.meta} lang={p.lang} rate="ban_rate" onPick={p.onBan} />
+          <SuggestCol items={p.banSug} heroes={p.heroes} meta={p.meta} lang={p.lang} rate="ban_rate" onPick={p.onBan} />
         </div>
       </div>
       <div className="mdc-legend mdc-mt8">
@@ -153,7 +179,7 @@ function HeroRow(p: HeroRowProps) {
     <div className="mdc-card mdc-rowcard">
       <button type="button" className="mdc-press mdc-rowbtn" onClick={p.onToggle} aria-expanded={p.expanded}>
         <Avatar id={h.id} heroes={p.heroes} meta={p.meta} lang={p.lang} size={30} />
-        <span className="mdc-uname">
+        <div className="mdc-uname">
           <b>
             #{i + 1} {h.name}
           </b>{' '}
@@ -165,8 +191,22 @@ function HeroRow(p: HeroRowProps) {
           <span className="mdc-chip">{h.lane}</span> <span className="mdc-muted">{h.roles.join('/')}</span>
           <br />
           <span className="mdc-muted">{m ? `${m.win_rate}% WR · ${m.pick_rate}% pick` : 'no meta'}</span>
-        </span>
+        </div>
         {p.showScore && rec ? <b className="mdc-goldnum mdc-bignum">{rec.score}</b> : null}
+        {rec && (rec.counters.length > 0 || (rec.allies?.length ?? 0) > 0) && (
+          <span className="mdc-inline-tags">
+            {rec.counters.map((c) => (
+              <span key={c} className="mdc-chip mdc-counter" title={`Counters ${c}`}>
+                ⚔ {c}
+              </span>
+            ))}
+            {(rec.allies ?? []).map((a) => (
+              <span key={a} className="mdc-chip mdc-synergy" title={`Synergy with ${a}`}>
+                ✦ {a}
+              </span>
+            ))}
+          </span>
+        )}
         <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" className="mdc-chev">
           <path
             d={p.expanded ? 'M2 8l4-4 4 4' : 'M2 4l4 4 4-4'}
@@ -199,10 +239,26 @@ function HeroRow(p: HeroRowProps) {
             </ul>
           )}
           {rec && (
-            <div className="mdc-muted mdc-mt4">
-              counter {Math.round(rec.breakdown.counter)} · meta {Math.round(rec.breakdown.meta)} · comp {Math.round(rec.breakdown.comp)} ·
-              mastery {Math.round(rec.breakdown.mastery)}
-            </div>
+            <>
+              <div className="mdc-muted mdc-mt4">
+                counter {Math.round(rec.breakdown.counter)} · meta {Math.round(rec.breakdown.meta)} · comp {Math.round(rec.breakdown.comp)}{' '}
+                · mastery {Math.round(rec.breakdown.mastery)}
+              </div>
+              {(rec.counters.length > 0 || (rec.allies?.length ?? 0) > 0) && (
+                <div className="mdc-tags">
+                  {rec.counters.map((c) => (
+                    <span key={c} className="mdc-chip mdc-counter" title={`Counters ${c}`}>
+                      ⚔ {c}
+                    </span>
+                  ))}
+                  {(rec.allies ?? []).map((a) => (
+                    <span key={a} className="mdc-chip mdc-synergy" title={`Synergy with ${a}`}>
+                      ✦ {a}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           <div className="mdc-actions" ref={actionsRef}>
             {act('ally', p.labels.addAlly)}

@@ -1,14 +1,20 @@
 import fs from 'node:fs';
-import { parseHeroPage, isValidSlug } from './parse.mjs';
+import { parseHeroPage, isValidSlug, tierScore } from './parse.mjs';
 import { fetchWithUA } from './http.mjs';
 import { cacheIcons } from './cache-icons.mjs';
+import { resolvePatch } from './patch-source.mjs';
 
 // pnpm data:update — sync data from mlbbhub (community source).
 // 1. Heroes new to the API -> append to heroes.json (name/role/lane/icon scraped from the hero page).
 // 2. Rewrite meta.json for every hero.
 // New heroes get the NoData tag (neutral scores, no counters) — counters are filled in by hand over time.
-// Patch label comes from the argument: pnpm data:update 2.1.96
-
+// Patch label resolution lives in ./patch-source.mjs so it can be unit
+// tested without side effects. Sources, in priority order:
+//   1. CLI argument: pnpm data:update 2.1.96
+//   2. PATCH_LABEL environment variable (CI override).
+//   3. Scrape the current patch from https://mlbbhub.com/statistics.
+//   4. Last patch label written into data/heroes.json by the previous run.
+//   5. Hard fallback `'2.1.95a'`.
 const API = 'https://mlbbhub.com/api/stats';
 
 function readJson(p) {
@@ -20,7 +26,8 @@ function readJson(p) {
   }
 }
 
-const patch = process.argv[2] ?? '2.1.95a';
+const { patch, source } = await resolvePatch({ fetcher: fetchWithUA });
+process.stdout.write(`patch source: ${source} -> ${patch}\n`);
 const heroes = readJson('./data/heroes.json');
 const have = new Set(heroes.map((h) => h.id));
 

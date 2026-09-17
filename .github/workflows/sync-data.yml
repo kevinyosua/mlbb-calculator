@@ -1,0 +1,205 @@
+name: Sync Patch Data
+
+# Manual trigger: Actions -> Sync Patch Data -> Run workflow.
+# `patch` is optional. When empty, data:update scrapes the latest patch
+# label from mlbbhub.com/statistics (falling back to the previous run's
+# label in data/heroes.json, then '2.1.95a'). Pass a value to override.
+on:
+  workflow_dispatch:
+    inputs:
+      patch:
+        description: "Patch override, e.g. 2.1.96 (empty = auto-detect)"
+        required: false
+        default: ""
+        type: string
+      bump_app_version:
+        description: "Write patch into package.json version field"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+# One sync at a time per branch.
+concurrency:
+  group: sync-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Update data and open MR
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PATCH_LABEL: ${{ inputs.patch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up pnpm and Node
+        uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+        with:
+          runtime: node@24
+          cache: true
+          require-lockfile: true
+
+      # data:update, counters:update, and icons:cache all talk to
+      # mlbbhub.com. Retry on transient failures (timeouts, 5xx) up to
+      # 3 times with 10s backoff. Each script is independent: a failure
+      # in one stops the pipeline so the MR is never half-updated.
+      - name: Update scripts (retry x3)
+        env:
+          PATCH_API_TOKEN: ${{ secrets.PATCH_API_TOKEN }}
+        run: |
+          set +e
+          attempt() {
+            local cmd="$1"
+            local max=3
+            local delay=10
+            local n=1
+            while [ $n -le $max ]; do
+              echo "::group::Attempt $n/$max: $cmd"
+              if eval "$cmd"; then
+                echo "::endgroup::"
+                return 0
+              fi
+              echo "::endgroup::"
+              if [ $n -eq $max ]; then
+                echo "::error::$cmd failed after $max attempts"
+                return 1
+              fi
+              sleep "$delay"
+              n=$((n+1))
+            done
+          }
+          attempt "pnpm run data:update"
+          attempt "pnpm run counters:update"
+          attempt "pnpm run icons:cache"
+          set -e
+
+      # Sanity check: the run must have produced patch rows.
+      # If patches.json is unchanged from origin/main, the update was a
+      # no-op and we exit without opening a MR.
+      - name: Derive version + check diff
+        id: meta
+        run: |
+          # latest patch label = top entry's patch field (the script
+          # writes the newest row first; sort -V to be safe).
+          LATEST=$(node -e "
+            const p = require('./data/patches.json');
+            const arr = p.map(x => x.patch);
+            arr.sort((a,b)=>b.localeCompare(a,'en',{numeric:true}));
+            process.stdout.write(arr[0] || '');
+          ")
+          if [ -z "$LATEST" ]; then
+            echo "::error::Could not read latest patch from data/patches.json"
+            exit 1
+          fi
+          echo "LATEST=$LATEST" >> "$GITHUB_OUTPUT"
+          echo "Latest patch: $LATEST"
+
+          # optional: write into package.json version field.
+          # Use the raw patch label (e.g. "2.1.96"); npm semver allows
+          # only [0-9A-Za-z.-], so "2.1.95a" is valid.
+          if [ "${{ inputs.bump_app_version }}" = "true" ]; then
+            node -e "
+              const fs = require('fs');
+              const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              p.version = '$LATEST';
+              const out = JSON.stringify(p, null, 2) + '\n';
+              fs.writeFileSync('package.json', out);
+            "
+          fi
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "CHANGED=false" >> "$GITHUB_OUTPUT"
+            echo "No data changes detected."
+          else
+            echo "CHANGED=true" >> "$GITHUB_OUTPUT"
+            echo "Changes detected:"
+            git diff --cached --stat
+          fi
+
+      - name: Prepend CHANGELOG entry
+        if: steps.meta.outputs.CHANGED == 'true'
+        run: |
+          LATEST="${{ steps.meta.outputs.LATEST }}"
+          DATE=$(date -u +%Y-%m-%d)
+          TMP=$(mktemp)
+          {
+            echo "## [${LATEST}] - ${DATE}"
+            echo "- data:update"
+            echo "- counters:update"
+            echo "- icons:cache"
+            echo ""
+            cat CHANGELOG.md 2>/dev/null || true
+          } > "$TMP"
+          mv "$TMP" CHANGELOG.md
+
+      - name: Lint + test
+        if: steps.meta.outputs.CHANGED == 'true'
+        run: |
+          pnpm run lint
+          pnpm run test
+
+      - name: Push branch + open MR
+        if: steps.meta.outputs.CHANGED == 'true'
+        env:
+          LATEST: ${{ steps.meta.outputs.LATEST }}
+        run: |
+          BRANCH="sync/patch-${LATEST}-$(date +%s)"
+          git config user.email "ci-bot@users.noreply.github.com"
+          git config user.name "ci-bot"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "chore(sync): patch $LATEST [skip ci]"
+          git push origin "$BRANCH"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+      - name: Open PR
+        if: steps.meta.outputs.CHANGED == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = process.env.BRANCH;
+            const latest = process.env.LATEST;
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🔄 Sync patch ${latest}`,
+              head: branch,
+              base: 'main',
+              const runUrl = context.payload.workflow_run
+                ? `${context.server_url}/${context.repo.owner}/`
+                  + `${context.repo.repo}/actions/runs/${context.runId}`
+                : '';
+              body: [
+                '## Patch sync',
+                '',
+                `Label: \`${latest}\``,
+                '',
+                'Auto-generated from upstream mlbbhub data.',
+                '',
+                runUrl ? `Run: ${runUrl}` : '',
+                '',
+                '### Review checklist',
+                '- [ ] `data/heroes.json` diff looks reasonable',
+                '- [ ] `data/meta.json` rates within expected range',
+                '- [ ] `data/counters.json` counter pairs look correct',
+                `- [ ] \`package.json\` version = \`${latest}\``,
+              ].filter(Boolean).join('\n'),
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              labels: ['patch-sync', 'auto-update']
+            });
+            core.info(`Opened PR #${pr.number}`);

@@ -1,0 +1,86 @@
+name: Release on Merge
+
+# Triggered when a PR is merged into main. Reads package.json version,
+# tags the commit, and creates a GitHub Release with the top CHANGELOG
+# section as the body.
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: meta
+        run: |
+          VERSION=$(node -e "process.stdout.write(require('./package.json').version)") || true
+          TAG="v${VERSION}"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Tag: $TAG"
+
+      - name: Skip already-tagged releases
+        id: tagcheck
+        run: |
+          git fetch --tags
+          if git rev-parse "${{ steps.meta.outputs.TAG }}" >/dev/null 2>&1; then
+            echo "EXISTS=true" >> "$GITHUB_OUTPUT"
+            echo "Tag ${{ steps.meta.outputs.TAG }} already exists, skipping."
+          else
+            echo "EXISTS=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Extract changelog section
+        id: changelog
+        if: steps.tagcheck.outputs.EXISTS == 'false'
+        run: |
+          SECTION=$(awk '
+            /^## \[/ { count++; if (count == 2) exit }
+            count == 1 { print }
+          ' CHANGELOG.md)
+          if [ -z "$SECTION" ]; then
+            SECTION="Auto-generated release."
+          fi
+          {
+            echo "body<<EOF"
+            echo "$SECTION"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Tag
+        if: steps.tagcheck.outputs.EXISTS == 'false'
+        run: |
+          git config user.email "ci-bot@users.noreply.github.com"
+          git config user.name "ci-bot"
+          git tag -a "${{ steps.meta.outputs.TAG }}" \
+            -m "Release ${{ steps.meta.outputs.TAG }}"
+          git push origin "${{ steps.meta.outputs.TAG }}"
+
+      - name: Create release
+        if: steps.tagcheck.outputs.EXISTS == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.TAG }}
+          name: "Patch ${{ steps.meta.outputs.TAG }}"
+          body: ${{ steps.changelog.outputs.body }}
+          draft: false
+          # npm semver allows 2.1.95a (numeric+letter suffix), which
+          # GitHub treats as a stable tag, so this stays false unless
+          # the patch label contains -beta or -rc.
+          prerelease: >-
+            ${{
+              contains(steps.meta.outputs.VERSION, '-beta')
+              || contains(steps.meta.outputs.VERSION, '-rc')
+            }}

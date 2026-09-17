@@ -1,0 +1,140 @@
+name: Rollback Cloudflare Pages
+
+# Manual rollback via the Cloudflare Pages Deployments API.
+# Lists the last 20 prod deployments, picks the previous one (or the
+# one named in the input), and atomically rolls back. No rebuild, no
+# DNS change. CF records the rollback as a new deployment.
+on:
+  workflow_dispatch:
+    inputs:
+      target_deployment:
+        description: "Deployment ID to roll back to (empty = previous)"
+        required: false
+        type: string
+      reason:
+        description: "Reason for rollback"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_PROJECT: ${{ vars.PAGES_PROJECT || 'mlbb-draft-coach' }}
+    steps:
+      - name: Verify credentials and project
+        run: |
+          missing=0
+          if [ -z "$CF_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is empty. Add it under"
+            echo "  Settings -> Secrets and variables -> Actions -> Secrets."
+            missing=1
+          fi
+          if [ -z "$CF_ACCOUNT_ID" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID is empty. Add it under"
+            echo "  Settings -> Secrets and variables -> Actions -> Secrets."
+            missing=1
+          fi
+          if [ "$missing" -eq 1 ]; then
+            exit 1
+          fi
+
+          body="${RUNNER_TEMP:-/tmp}/cf-response.json"
+          status=$(curl -sS -o "$body" -w '%{http_code}' \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/pages/projects/$CF_PROJECT")
+          if [ "$status" != "200" ]; then
+            echo "::error::Cloudflare rejected the request (HTTP $status)."
+            grep -o '"message":"[^"]*"' "$body" || cat "$body"
+            exit 1
+          fi
+          echo "Token is valid and project \"$CF_PROJECT\" exists."
+
+      - name: List recent deployments
+        id: list
+        run: |
+          URL="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID"
+          URL="$URL/pages/projects/$CF_PROJECT/deployments?per_page=20"
+
+          curl -sS "$URL" -H "Authorization: Bearer $CF_API_TOKEN" \
+            > deploys.json
+
+          echo "Recent production deployments:"
+          jq -r '.result[] | select(.environment=="production") | "\(.id) \(.created_on) \(.url)"' \
+            deploys.json | head -5
+
+          if [ -n "${{ inputs.target_deployment }}" ]; then
+            TARGET="${{ inputs.target_deployment }}"
+          else
+            TARGET=$(jq -r '.result[] | select(.environment=="production") | .id' deploys.json | sed -n '2p')
+          fi
+
+          CURRENT=$(jq -r '.result[] | select(.environment=="production") | .id' deploys.json | head -1)
+          # noqa: line-length
+
+          if [ -z "$TARGET" ]; then
+            echo "::error::No previous production deployment found"
+            exit 1
+          fi
+
+          echo "TARGET=$TARGET" >> "$GITHUB_OUTPUT"
+          echo "CURRENT=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "::notice::Rolling back $CURRENT -> $TARGET"
+
+      - name: Execute rollback
+        id: rollback
+        run: |
+          BODY=$(jq -n --arg msg "${{ inputs.reason }}" '{message: $msg}')
+
+          ROLLBACK_URL="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID"
+          ROLLBACK_URL="$ROLLBACK_URL/pages/projects/$CF_PROJECT/deployments"
+          ROLLBACK_URL="$ROLLBACK_URL/${{ steps.list.outputs.TARGET }}/rollback"
+
+          HTTP=$(curl -sS -o rollback-response.json -w '%{http_code}' \
+            -X POST "$ROLLBACK_URL" \
+            -H "Authorization: Bearer $CF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$BODY")
+
+          cat rollback-response.json | jq .
+          if [ "$HTTP" != "200" ]; then
+            echo "::error::Rollback HTTP $HTTP"
+            exit 1
+          fi
+
+          SUCCESS=$(jq -r '.success' rollback-response.json)
+          if [ "$SUCCESS" != "true" ]; then
+            echo "::error::Rollback returned success=false"
+            exit 1
+          fi
+
+          echo "Rollback initiated."
+
+      - name: Verify new production deployment
+        if: success()
+        run: |
+          sleep 5
+          VERIFY_URL="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID"
+          VERIFY_URL="$VERIFY_URL/pages/projects/$CF_PROJECT/deployments?per_page=3"
+
+          curl -sS "$VERIFY_URL" -H "Authorization: Bearer $CF_API_TOKEN" -o v.json
+          jq '.result[]|select(.environment=="production")|{id,created_on,url,latest_stage}' v.json
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Rollback"
+            echo "- from: \`${{ steps.list.outputs.CURRENT }}\`"
+            echo "- to:   \`${{ steps.list.outputs.TARGET }}\`"
+            echo "- reason: ${{ inputs.reason }}"
+            echo "- by: @${{ github.actor }}"
+            RUN_URL="${{ github.server_url }}/${{ github.repository }}"
+            echo "- run: $RUN_URL/actions/runs/${{ github.run_id }}"
+          } >> "$GITHUB_STEP_SUMMARY"

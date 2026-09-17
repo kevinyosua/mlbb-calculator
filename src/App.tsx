@@ -7,6 +7,7 @@ import type { Rec } from './engine/types';
 import { STR, type Lang } from './i18n';
 import { reportError, useLastError } from './ui/errors';
 import { FilterBar } from './ui/filter';
+import { FloatingBoard } from './ui/floating-board';
 import { HeroRows, SuggestPair } from './ui/rows';
 import { DraftBoard } from './ui/slots';
 import { ALL_LANE, ALL_ROLE, MAX_LINE, type Side } from './ui/theme';
@@ -34,7 +35,43 @@ export default function App() {
   const [openHero, setOpenHero] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(true);
   const qRef = useRef<HTMLInputElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const heroRowsRef = useRef<HTMLDivElement>(null);
+  const fbRef = useRef<HTMLElement>(null);
+  const [boardVisible, setBoardVisible] = useState(true);
   const firstRender = useRef(true);
+  // Keep page pinned to top on first paint — the sticky-bottom filter bar would otherwise
+  // trick the browser into scrolling past the hero list to make it visible.
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+    const pinTop = () => {
+      if (window.scrollY !== 0) window.scrollTo(0, 0);
+      // Strip any browser-implicit focus from the first paint (mobile keyboards
+      // open on the search input otherwise, and re-anchor the viewport).
+      const ae = document.activeElement;
+      if (ae instanceof HTMLInputElement || ae instanceof HTMLSelectElement) ae.blur();
+    };
+    pinTop();
+    const raf1 = requestAnimationFrame(pinTop);
+    const raf2 = requestAnimationFrame(() => requestAnimationFrame(pinTop));
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, []);
+  // Track if DraftBoard is on-screen — show FloatingBoard when it's not.
+  useEffect(() => {
+    const el = boardRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) setBoardVisible(e.isIntersecting);
+      },
+      { rootMargin: '-12px 0px 0px 0px', threshold: 0 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   useEffect(() => {
     if (firstRender.current) {
       firstRender.current = false;
@@ -138,6 +175,10 @@ export default function App() {
       if (!enemyBans.includes(id)) setEnemyBans([...enemyBans, id]);
     }
     setQ('');
+    qRef.current?.focus();
+    // Pick/ban click refocuses the search input — scroll the HeroRows section
+    // to the top so the user sees the input + start of the hero list, not a row buried mid-list.
+    heroRowsRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
   const removeSide = (side: Side, id: string) => {
     if (side === 'ally') setAllies(allies.filter((x) => x !== id));
@@ -210,19 +251,36 @@ export default function App() {
         </section>
       ) : null}
 
-      <DraftBoard
-        allies={allies}
-        enemies={enemies}
-        ourBans={ourBans}
-        enemyBans={enemyBans}
-        max={MAX_LINE}
-        titles={{ allies: t.allies, enemies: t.enemies, ourBans: t.ourBans, enemyBans: t.enemyBans }}
-        removeWord={t.remove}
-        heroes={data.heroes}
-        meta={data.meta}
-        lang={lang}
-        onRemove={removeSide}
-      />
+      <div ref={boardRef}>
+        <DraftBoard
+          allies={allies}
+          enemies={enemies}
+          ourBans={ourBans}
+          enemyBans={enemyBans}
+          max={MAX_LINE}
+          titles={{ allies: t.allies, enemies: t.enemies, ourBans: t.ourBans, enemyBans: t.enemyBans }}
+          removeWord={t.remove}
+          heroes={data.heroes}
+          meta={data.meta}
+          lang={lang}
+          onRemove={removeSide}
+        />
+      </div>
+      {!boardVisible && (
+        <FloatingBoard
+          allies={allies}
+          enemies={enemies}
+          ourBans={ourBans}
+          enemyBans={enemyBans}
+          max={MAX_LINE}
+          heroes={data.heroes}
+          meta={data.meta}
+          lang={lang}
+          removeWord={t.remove}
+          onRemove={removeSide}
+          rootRef={fbRef}
+        />
+      )}
       {(allies.length > 0 || enemies.length > 0) && (
         <section className="mdc-card mdc-mt8" aria-label={t.draftRating}>
           <p className="mdc-title">{t.draftRating}</p>
@@ -313,27 +371,29 @@ export default function App() {
         )}
       </div>
 
-      <HeroRows
-        list={list}
-        allies={allies}
-        enemies={enemies}
-        ourBans={ourBans}
-        enemyBans={enemyBans}
-        max={MAX_LINE}
-        scoreMap={scoreMap}
-        metaById={metaById}
-        openHero={openHero}
-        showScore={enemies.length > 0}
-        heroes={data.heroes}
-        meta={data.meta}
-        lang={lang}
-        labels={{ pickGroup: t.pickGroup, banGroup: t.banGroup, teamUs: t.teamUs, teamThem: t.teamThem }}
-        onToggle={(id) => setOpenHero(openHero === id ? null : id)}
-        onAdd={(s, id) => {
-          addSide(s, id);
-          setOpenHero(null);
-        }}
-      />
+      <div ref={heroRowsRef} className="mdc-heroes-anchor">
+        <HeroRows
+          list={list}
+          allies={allies}
+          enemies={enemies}
+          ourBans={ourBans}
+          enemyBans={enemyBans}
+          max={MAX_LINE}
+          scoreMap={scoreMap}
+          metaById={metaById}
+          openHero={openHero}
+          showScore={enemies.length > 0}
+          heroes={data.heroes}
+          meta={data.meta}
+          lang={lang}
+          labels={{ pickGroup: t.pickGroup, banGroup: t.banGroup, teamUs: t.teamUs, teamThem: t.teamThem }}
+          onToggle={(id) => setOpenHero(openHero === id ? null : id)}
+          onAdd={(s, id) => {
+            addSide(s, id);
+            setOpenHero(null);
+          }}
+        />
+      </div>
 
       <FilterBar
         open={filterOpen}

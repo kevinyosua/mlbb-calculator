@@ -24,6 +24,9 @@
 html {
   --mdc-scroll-pad: 120px;
   scroll-padding-bottom: calc(var(--mdc-scroll-pad) + env(safe-area-inset-bottom));
+  /* Sticky-bottom filter bar can shift the viewport anchor on first paint;
+     disable anchoring so layout changes don't yank the user away from top. */
+  overflow-anchor: none;
 }
 
 body {
@@ -617,4 +620,61 @@ select {
   border-bottom: none;
   border-radius: 16px 16px 0 0;
   padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+}
+
+/* Keep HeroRows clear of the sticky floating board when scrollIntoView
+   pins it to the viewport top. The var is published by App/FloatingBoard. */
+.mdc-heroes-anchor {
+  scroll-margin-top: calc(var(--mdc-fb-h, 0px) + 8px);
+}
+
+/* ---- floating mini DraftBoard ---- */
+.mdc-fb {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: rgba(7, 11, 24, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--goldline);
+  padding: 6px 10px;
+  margin: 0 -12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mdc-fb-line {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr) 10px repeat(5, 1fr);
+  gap: 4px;
+  align-items: center;
+}
+.mdc-fb-sep {
+  width: 10px;
+  height: 1px;
+}
+.mdc-fb-ally {
+  border-left: 2px solid var(--blue);
+  padding-left: 4px;
+}
+.mdc-fb-enemy {
+  border-left: 2px solid var(--red);
+  padding-left: 4px;
+}
+.mdc-fb-empty {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px dashed #3b4d7d;
+  opacity: 0.45;
+  justify-self: center;
+}
+@media (max-width: 360px) {
+  .mdc-fb-line {
+    gap: 2px;
+  }
+  .mdc-fb-empty {
+    width: 20px;
+    height: 20px;
+  }
 }

@@ -186,7 +186,7 @@ export default function App() {
     else if (side === 'ourBan') setOurBans(ourBans.filter((x) => x !== id));
     else setEnemyBans(enemyBans.filter((x) => x !== id));
   };
-  const allyWarnings = useMemo(() => allyWarns(data.heroes, data.syn, allies, t.antiSyn), [allies, t.antiSyn]);
+  const allyWarnings = useMemo(() => allyWarns(data.syn, allies), [allies]);
   const weakness = useMemo(
     () => teamWeakness(data.heroes, allies, { missing: t.missing, noFrontline: t.noFrontline, noDamage: t.noDamage }),
     [allies, t.missing, t.noFrontline, t.noDamage],
@@ -278,6 +278,8 @@ export default function App() {
           lang={lang}
           removeWord={t.remove}
           onRemove={removeSide}
+          allyRating={allyRating}
+          enemyRating={enemyRating}
           rootRef={fbRef}
         />
       )}
@@ -326,27 +328,40 @@ export default function App() {
         onPick={(id) => addSide('ally', id)}
         onBan={(id) => addSide('ourBan', id)}
       />
-      {(allyWarnings.length > 0 || (allies.length > 0 && weakness.length > 0)) && (
+      {(allyWarnings.length > 0 || (allies.length > 0 && (weakness.missing.length > 0 || weakness.gaps.length > 0))) && (
         <section className="mdc-card mdc-warn" role="status">
           {allyWarnings.length > 0 && (
-            <>
+            <div className="mdc-warn-chips">
               <b>{t.warnings}</b>
-              <ul className="mdc-ul-loose">
+              <div className="mdc-warn-row">
                 {allyWarnings.map((w) => (
-                  <li key={w}>{w}</li>
+                  <span key={w} className="mdc-chip mdc-chip-warn">
+                    {w}
+                  </span>
                 ))}
-              </ul>
-            </>
+              </div>
+            </div>
           )}
-          {allies.length > 0 && (
-            <>
+          {allies.length > 0 && (weakness.missing.length > 0 || weakness.gaps.length > 0) && (
+            <div className={`mdc-warn-chips${allyWarnings.length > 0 ? ' mdc-mt6' : ''}`}>
               <b>{t.weakness}</b>
-              <ul className="mdc-ul-tight">
-                {weakness.map((w) => (
-                  <li key={w}>{w}</li>
-                ))}
-              </ul>
-            </>
+              <div className="mdc-warn-2col">
+                <div className="mdc-warn-row">
+                  {weakness.missing.map((w) => (
+                    <span key={w} className="mdc-chip mdc-chip-miss">
+                      {w}
+                    </span>
+                  ))}
+                </div>
+                <div className="mdc-warn-row">
+                  {weakness.gaps.map((w) => (
+                    <span key={w} className="mdc-chip mdc-chip-gap">
+                      {w}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </section>
       )}

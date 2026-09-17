@@ -192,20 +192,28 @@ export function suggestPickIds(
     .map(({ r, hero }) => ({ id: r.hero, counters: r.counters, allies: r.allies, lane: hero.lane }));
 }
 
-// Anti-synergy warnings between allies (reads synergies only).
-export function allyWarnings(heroes: Hero[], syn: SynergyRel[], allies: string[], label: string): string[] {
-  void heroes;
+// Anti-synergy warnings between allies. Returns unique reasons from the
+// synergies list — caller wraps them under its own heading.
+export function allyWarnings(syn: SynergyRel[], allies: string[]): string[] {
+  // Index anti-synergies by sorted pair so (A,B) and (B,A) collapse to one entry.
+  const idx = new Map<string, string>();
+  for (const x of syn) {
+    if (x.type !== 'ANTI_SYNERGY') continue;
+    const k = x.source < x.target ? `${x.source}|${x.target}` : `${x.target}|${x.source}`;
+    if (!idx.has(k)) idx.set(k, x.reason);
+  }
+  // Scan ally pairs once; constant-time lookup.
   const out: string[] = [];
-  for (let i = 0; i < allies.length; i++)
+  for (let i = 0; i < allies.length; i++) {
     for (let j = i + 1; j < allies.length; j++) {
-      const hit = syn.find(
-        (x) =>
-          x.type === 'ANTI_SYNERGY' &&
-          ((x.source === allies[i] && x.target === allies[j]) || (x.source === allies[j] && x.target === allies[i])),
-      );
-      if (hit) out.push(`${label}: ${hit.reason}`);
+      const a = allies[i];
+      const b = allies[j];
+      const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+      const reason = idx.get(k);
+      if (reason && !out.includes(reason)) out.push(reason);
     }
-  return [...new Set(out)];
+  }
+  return out;
 }
 
 export interface WeaknessLabels {
@@ -214,14 +222,22 @@ export interface WeaknessLabels {
   noDamage: string;
 }
 
-// Weakness: lanes and roles still missing from the ally team.
-export function teamWeakness(heroes: Hero[], allies: string[], t: WeaknessLabels): string[] {
-  const out: string[] = [];
+export interface TeamWeakness {
+  /** Lanes not yet covered by any ally. Each entry: "<missing> <lane>". */
+  missing: string[];
+  /** Team-composition gaps: frontline / damage. */
+  gaps: string[];
+}
+
+// Lanes and roles still missing from the ally team, split for compact rendering.
+export function teamWeakness(heroes: Hero[], allies: string[], t: WeaknessLabels): TeamWeakness {
   const allyH = heroes.filter((h) => allies.includes(h.id));
+  const missing: string[] = [];
   for (const l of ['Exp', 'Jungle', 'Mid', 'Gold', 'Roam']) {
-    if (!allyH.some((h) => h.lane === l)) out.push(`${t.missing} ${l}`);
+    if (!allyH.some((h) => h.lane === l)) missing.push(`${t.missing} ${l}`);
   }
-  if (!allyH.some((h) => h.roles.includes('Tank') || h.tags.includes('Frontline'))) out.push(t.noFrontline);
-  if (!allyH.some((h) => h.roles.includes('Marksman') || h.roles.includes('Mage') || h.roles.includes('Assassin'))) out.push(t.noDamage);
-  return [...new Set(out)];
+  const gaps: string[] = [];
+  if (!allyH.some((h) => h.roles.includes('Tank') || h.tags.includes('Frontline'))) gaps.push(t.noFrontline);
+  if (!allyH.some((h) => h.roles.includes('Marksman') || h.roles.includes('Mage') || h.roles.includes('Assassin'))) gaps.push(t.noDamage);
+  return { missing, gaps };
 }

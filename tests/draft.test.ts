@@ -155,8 +155,8 @@ describe('draft', () => {
     const s = [
       { source: 'a', target: 'b', type: 'ANTI_SYNERGY', score: 10, reason: 'clash', sources: ['x'], patch_verified: 'p' },
     ] as SynergyRel[];
-    expect(allyWarnings(heroes, s, ['a', 'b'], 'Anti')).toEqual(['Anti: clash']);
-    expect(allyWarnings(heroes, s, ['a'], 'Anti')).toEqual([]);
+    expect(allyWarnings(s, ['a', 'b'])).toEqual(['clash']);
+    expect(allyWarnings(s, ['a'])).toEqual([]);
   });
   it('teamWeakness flags empty team fully', () => {
     expect(teamWeakness(heroes, [], { missing: 'Missing', noFrontline: 'NF', noDamage: 'ND' })).toHaveLength(7);

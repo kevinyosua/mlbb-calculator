@@ -501,32 +501,39 @@ select {
   margin-top: 8px;
   background: var(--card);
   border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 10px;
+  border-radius: 10px;
+  padding: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  max-height: min(54svh, 380px);
+  max-height: min(48svh, 320px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
 .mdc-frow {
   align-items: center;
+  gap: 4px;
 }
 .mdc-frow + .mdc-frow {
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .mdc-frow input,
 .mdc-frow select {
   min-width: 0;
-  font-size: 1em;
+  font-size: 0.875em;
+  padding: 4px 6px;
+}
+.mdc-frow input {
+  height: 1.2em;
 }
 .mdc-frow select {
   text-overflow: ellipsis;
+  height: 1.2em;
 }
 .mdc-iconbtn {
   flex-shrink: 0;
-  width: var(--touch);
-  padding: 6px 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -640,38 +647,57 @@ select {
   padding: 6px 10px;
   margin: 0 -12px 8px;
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.mdc-fb-side {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
   flex-direction: column;
   gap: 4px;
 }
-.mdc-fb-line {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr) 10px repeat(5, 1fr);
-  gap: 4px;
+.mdc-fb-row {
+  display: flex;
+  gap: 6px;
   align-items: center;
+  min-height: 32px;
 }
-.mdc-fb-sep {
-  width: 10px;
-  height: 1px;
+.mdc-fb-bans {
+  opacity: 0.75;
+}
+.mdc-fb-rate {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.95em;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.mdc-fb-rate-ally {
+  color: var(--blue);
+}
+.mdc-fb-rate-enemy {
+  color: var(--red);
 }
 .mdc-fb-ally {
   border-left: 2px solid var(--blue);
   padding-left: 4px;
 }
 .mdc-fb-enemy {
-  border-left: 2px solid var(--red);
-  padding-left: 4px;
+  border-right: 2px solid var(--red);
+  padding-right: 4px;
 }
 .mdc-fb-empty {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: 1px dashed #3b4d7d;
   opacity: 0.45;
-  justify-self: center;
 }
 @media (max-width: 360px) {
-  .mdc-fb-line {
-    gap: 2px;
+  .mdc-fb-side {
+    gap: 4px;
   }
   .mdc-fb-empty {
     width: 20px;

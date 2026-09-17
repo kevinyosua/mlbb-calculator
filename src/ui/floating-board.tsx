@@ -15,6 +15,8 @@ interface FloatingBoardProps {
   lang: Lang;
   removeWord: string;
   onRemove: (side: Side, id: string) => void;
+  allyRating: number;
+  enemyRating: number;
   /**
    * Ref to the outer <aside>. App uses this to publish the rendered height
    * into a CSS var (`--mdc-fb-h`) so HeroRows can apply `scroll-margin-top`
@@ -23,9 +25,10 @@ interface FloatingBoardProps {
   rootRef?: RefObject<HTMLElement | null>;
 }
 
-// One row of avatars for a "side" (ally or enemy). Shows picks first, then bans,
-// filling remaining slots with dashed placeholders up to `max * 2`.
-function MiniLine({
+// One side of the floating board: picks row on top, bans row below.
+// Both rows keep `max` slots with dashed placeholders for empties — matches
+// DraftBoard's pick+ban pair visually.
+function MiniSide({
   ids,
   banIds,
   side,
@@ -48,43 +51,44 @@ function MiniLine({
 }) {
   const banSide: Side = side === 'ally' ? 'ourBan' : 'enemyBan';
   const tone = side === 'ally' ? 'mdc-fb-ally' : 'mdc-fb-enemy';
-  // Layout: picks fill the first `max` cells (left), bans fill the last `max`
-  // cells (right); empty slots pad whichever side still has room.
   const pickEmpties = Math.max(0, max - ids.length);
   const banEmpties = Math.max(0, max - banIds.length);
   return (
-    <div className={`mdc-fb-line ${tone}`}>
-      {ids.map((id) => (
-        <button
-          type="button"
-          key={`${side}-${id}`}
-          className="mdc-avatarbtn"
-          onClick={() => onRemove(side, id)}
-          aria-label={`${removeWord} ${heroes.find((x) => x.id === id)?.name ?? id}`}
-          title={removeWord}
-        >
-          <Avatar id={id} heroes={heroes} meta={meta} lang={lang} size={28} />
-        </button>
-      ))}
-      {Array.from({ length: pickEmpties }).map((_, i) => (
-        <span key={`${side}-pempty-${i}`} className="mdc-fb-empty" aria-hidden />
-      ))}
-      <span className="mdc-fb-sep" aria-hidden />
-      {banIds.map((id) => (
-        <button
-          type="button"
-          key={`${banSide}-${id}`}
-          className="mdc-avatarbtn"
-          onClick={() => onRemove(banSide, id)}
-          aria-label={`${removeWord} ${heroes.find((x) => x.id === id)?.name ?? id}`}
-          title={removeWord}
-        >
-          <Avatar id={id} heroes={heroes} meta={meta} lang={lang} size={28} bannedMark />
-        </button>
-      ))}
-      {Array.from({ length: banEmpties }).map((_, i) => (
-        <span key={`${side}-bempty-${i}`} className="mdc-fb-empty" aria-hidden />
-      ))}
+    <div className={`mdc-fb-side ${tone}`}>
+      <div className="mdc-fb-row">
+        {ids.map((id) => (
+          <button
+            type="button"
+            key={`${side}-${id}`}
+            className="mdc-avatarbtn"
+            onClick={() => onRemove(side, id)}
+            aria-label={`${removeWord} ${heroes.find((x) => x.id === id)?.name ?? id}`}
+            title={removeWord}
+          >
+            <Avatar id={id} heroes={heroes} meta={meta} lang={lang} size={28} />
+          </button>
+        ))}
+        {Array.from({ length: pickEmpties }).map((_, i) => (
+          <span key={`${side}-pempty-${i}`} className="mdc-fb-empty" aria-hidden />
+        ))}
+      </div>
+      <div className="mdc-fb-row mdc-fb-bans">
+        {banIds.map((id) => (
+          <button
+            type="button"
+            key={`${banSide}-${id}`}
+            className="mdc-avatarbtn"
+            onClick={() => onRemove(banSide, id)}
+            aria-label={`${removeWord} ${heroes.find((x) => x.id === id)?.name ?? id}`}
+            title={removeWord}
+          >
+            <Avatar id={id} heroes={heroes} meta={meta} lang={lang} size={28} bannedMark />
+          </button>
+        ))}
+        {Array.from({ length: banEmpties }).map((_, i) => (
+          <span key={`${side}-bempty-${i}`} className="mdc-fb-empty" aria-hidden />
+        ))}
+      </div>
     </div>
   );
 }
@@ -113,7 +117,8 @@ export function FloatingBoard(p: FloatingBoardProps) {
   }
   return (
     <aside className="mdc-fb" aria-label="Draft summary" ref={p.rootRef}>
-      <MiniLine
+      <span className="mdc-fb-rate mdc-fb-rate-ally">{p.allyRating}</span>
+      <MiniSide
         ids={p.allies}
         banIds={p.ourBans}
         side="ally"
@@ -124,7 +129,7 @@ export function FloatingBoard(p: FloatingBoardProps) {
         removeWord={p.removeWord}
         onRemove={p.onRemove}
       />
-      <MiniLine
+      <MiniSide
         ids={p.enemies}
         banIds={p.enemyBans}
         side="enemy"
@@ -135,6 +140,7 @@ export function FloatingBoard(p: FloatingBoardProps) {
         removeWord={p.removeWord}
         onRemove={p.onRemove}
       />
+      <span className="mdc-fb-rate mdc-fb-rate-enemy">{p.enemyRating}</span>
     </aside>
   );
 }

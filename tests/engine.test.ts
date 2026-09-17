@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { recommend } from '../src/engine/recommend';
-import { teamRating } from '../src/engine/score';
+import { rateTeam, teamRating, winProbability } from '../src/engine/score';
 import type { CounterRel, Hero, MetaRow, PatchChange } from '../src/engine/types';
 import countersJson from '../data/counters.json';
 import heroesJson from '../data/heroes.json';
@@ -65,5 +65,39 @@ describe('engine', () => {
     const r = teamRating(['khufra', 'tigreal'], ['fanny'], heroes, counters, syn, [], noPatch, weights);
     expect(r).toBeGreaterThanOrEqual(0);
     expect(r).toBeLessThanOrEqual(100);
+  });
+  it('rateTeam returns score + breakdown with averages per axis', () => {
+    const r = rateTeam(['khufra', 'tigreal'], ['fanny'], heroes, counters, syn, [], noPatch, weights);
+    expect(r.score).toBeGreaterThan(0);
+    expect(r.score).toBeLessThanOrEqual(100);
+    expect(r.breakdown.counter).toBeGreaterThan(0);
+    expect(r.breakdown.meta).toBeGreaterThanOrEqual(0);
+    expect(r.breakdown.comp).toBeGreaterThanOrEqual(0);
+    expect(r.breakdown.mastery).toBe(50);
+    // Old API still works (back-compat shim).
+    const legacy = teamRating(['khufra', 'tigreal'], ['fanny'], heroes, counters, syn, [], noPatch, weights);
+    expect(legacy).toBe(r.score);
+  });
+  it('rateTeam: empty team returns zero score and zero breakdown', () => {
+    const r = rateTeam([], ['fanny'], heroes, counters, syn, [], noPatch, weights);
+    expect(r.score).toBe(0);
+    expect(r.breakdown).toEqual({ counter: 0, meta: 0, comp: 0, mastery: 0 });
+  });
+  it('winProbability: equal ratings -> 50%', () => {
+    expect(winProbability(60, 60)).toBe(50);
+  });
+  it('winProbability: empty side -> 50% (no baseline)', () => {
+    expect(winProbability(0, 60)).toBe(50);
+    expect(winProbability(60, 0)).toBe(50);
+  });
+  it('winProbability: +25 rating -> ~70%', () => {
+    const p = winProbability(75, 50);
+    expect(p).toBeGreaterThanOrEqual(66);
+    expect(p).toBeLessThanOrEqual(70);
+  });
+  it('winProbability: -25 rating -> ~30%', () => {
+    const p = winProbability(50, 75);
+    expect(p).toBeGreaterThanOrEqual(30);
+    expect(p).toBeLessThanOrEqual(34);
   });
 });

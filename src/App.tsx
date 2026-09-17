@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { loadAll, type GameData } from './data/load';
 import { allyWarnings as allyWarns, metaById as makeMetaById, rankList, suggestBanIds, suggestPickIds, teamWeakness } from './draft/draft';
 import { recommend } from './engine/recommend';
-import { synergyScore, teamRating } from './engine/score';
+import { rateTeam, synergyScore, winProbability } from './engine/score';
 import type { Rec } from './engine/types';
 import { STR, type Lang } from './i18n';
 import { reportError, useLastError } from './ui/errors';
@@ -210,15 +210,19 @@ export default function App() {
     () => suggestPickIds(allies, enemies, scoreMap, data.heroes, data.meta, [...allies, ...enemies, ...bans], data.syn),
     [enemies, scoreMap, allies, bans],
   );
-  // Rating draft ally vs enemy (0-100). Lihat teamRating di engine/score.
-  const allyRating = useMemo(
-    () => teamRating(allies, enemies, data.heroes, data.counters, data.syn, data.meta, data.patches, data.weights),
+  // Rating draft ally vs enemy (0-100) + per-axis breakdown. See rateTeam in engine/score.
+  const allyRated = useMemo(
+    () => rateTeam(allies, enemies, data.heroes, data.counters, data.syn, data.meta, data.patches, data.weights),
     [allies, enemies],
   );
-  const enemyRating = useMemo(
-    () => teamRating(enemies, allies, data.heroes, data.counters, data.syn, data.meta, data.patches, data.weights),
+  const enemyRated = useMemo(
+    () => rateTeam(enemies, allies, data.heroes, data.counters, data.syn, data.meta, data.patches, data.weights),
     [allies, enemies],
   );
+  const allyRating = allyRated.score;
+  const enemyRating = enemyRated.score;
+  // Win probability: 50 when one side is empty (no baseline to compare).
+  const winPct = useMemo(() => winProbability(allyRating, enemyRating), [allyRating, enemyRating]);
   // ponytail: dynamic widths stay as vars (rule flags object literals) — CSS attr() when widely supported.
   const allyBar = { width: `${Math.round(allyRating)}%` } as CSSProperties;
   const enemyBar = { width: `${Math.round(enemyRating)}%` } as CSSProperties;
@@ -280,17 +284,18 @@ export default function App() {
           onRemove={removeSide}
           allyRating={allyRating}
           enemyRating={enemyRating}
+          winPct={winPct}
           rootRef={fbRef}
         />
       )}
       {(allies.length > 0 || enemies.length > 0) && (
         <section className="mdc-card mdc-mt8" aria-label={t.draftRating}>
           <p className="mdc-title">{t.draftRating}</p>
-          <div className="mdc-col6">
-            <div className="mdc-rate-row">
-              <span className="mdc-rate-ally">{t.allies}</span>
+          <div className="mdc-rate-vs">
+            <div className="mdc-rate-side mdc-rate-side-ally">
+              <span className="mdc-rate-side-lbl">{t.allies}</span>
               <div
-                className="mdc-score mdc-grow"
+                className={`mdc-score mdc-grow mdc-bar-ally${allyRating > enemyRating ? ' mdc-bar-lead' : ''}`}
                 role="progressbar"
                 aria-valuenow={Math.round(allyRating)}
                 aria-valuemin={0}
@@ -301,10 +306,17 @@ export default function App() {
               </div>
               <b className="mdc-goldnum mdc-rate-num">{allyRating}</b>
             </div>
-            <div className="mdc-rate-row">
-              <span className="mdc-rate-enemy">{t.enemies}</span>
+            <fieldset
+              className={`mdc-rate-win${allies.length === 0 || enemies.length === 0 ? '' : allyRating > enemyRating ? ' mdc-win-ally' : allyRating < enemyRating ? ' mdc-win-enemy' : ' mdc-win-tie'}`}
+              aria-label={t.winChance}
+            >
+              <b className="mdc-rate-win-num">{allies.length === 0 || enemies.length === 0 ? t.noRating : `${winPct}%`}</b>
+              <span className="mdc-rate-win-lbl">{t.winChance}</span>
+            </fieldset>
+            <div className="mdc-rate-side mdc-rate-side-enemy">
+              <b className="mdc-goldnum mdc-rate-num">{enemyRating}</b>
               <div
-                className="mdc-score mdc-grow"
+                className={`mdc-score mdc-grow mdc-bar-enemy${enemyRating > allyRating ? ' mdc-bar-lead' : ''}`}
                 role="progressbar"
                 aria-valuenow={Math.round(enemyRating)}
                 aria-valuemin={0}
@@ -313,7 +325,7 @@ export default function App() {
               >
                 <i style={enemyBar} />
               </div>
-              <b className="mdc-goldnum mdc-rate-num">{enemyRating}</b>
+              <span className="mdc-rate-side-lbl">{t.enemies}</span>
             </div>
           </div>
         </section>

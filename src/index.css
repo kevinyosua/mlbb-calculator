@@ -704,3 +704,351 @@ select {
     height: 20px;
   }
 }
+
+/* ---- win chance + sub-score breakdown ---- */
+.mdc-rate-win {
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--gold);
+  background: var(--card2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+.mdc-rate-win-num {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+}
+.mdc-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+.mdc-bd-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 11px;
+}
+.mdc-bd-side {
+  width: 56px;
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--muted);
+}
+.mdc-bd-row:first-child .mdc-bd-side {
+  color: #93c5fd;
+}
+.mdc-bd-row:last-child .mdc-bd-side {
+  color: #fca5a5;
+}
+.mdc-bd-chip {
+  font-variant-numeric: tabular-nums;
+  padding: 2px 7px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--card2);
+  color: var(--text);
+}
+/* Color weak sub-scores (<40) red, OK (40-60) muted, strong (>60) green. */
+.mdc-bd-chip[data-axis="counter"] {
+  color: var(--gold);
+  border-color: var(--goldline);
+}
+.mdc-bd-chip[data-axis="meta"] {
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.35);
+}
+.mdc-bd-chip[data-axis="comp"] {
+  color: #6ee7b7;
+  border-color: rgba(110, 231, 183, 0.35);
+}
+.mdc-bd-chip[data-axis="mastery"] {
+  color: var(--muted);
+}
+
+/* Centered win% pill between the two sides on the floating board. */
+.mdc-fb-win {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 0.95em;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+/* "Chance to Win" label sits next to the big number so the unit is unmistakable. */
+.mdc-rate-win-lbl {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.85;
+}
+
+/* Floating-board win% — two-line block: huge number, tiny "WIN" label. */
+.mdc-fb-win {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 6px;
+  min-width: 48px;
+}
+.mdc-fb-win-num {
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+  line-height: 1;
+}
+.mdc-fb-win-lbl {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+/* ---- ally vs enemy on one row, win% below ---- */
+.mdc-rate-vs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mdc-rate-side {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mdc-rate-side-ally .mdc-rate-side-lbl {
+  color: #93c5fd;
+  order: 0;
+}
+.mdc-rate-side-enemy .mdc-rate-side-lbl {
+  color: #fca5a5;
+  order: 2;
+}
+.mdc-rate-side-lbl {
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.mdc-rate-side-ally .mdc-rate-num {
+  order: 2;
+}
+.mdc-rate-side-enemy .mdc-rate-num {
+  order: 0;
+}
+.mdc-rate-vs-sep {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+
+/* Ally/enemy power chips flanking the win% on the floating board. */
+.mdc-fb-power {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 0.85em;
+  padding: 0 4px;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+.mdc-fb-power-ally {
+  color: var(--blue);
+}
+.mdc-fb-power-enemy {
+  color: var(--red);
+}
+
+/* When the win% chip sits inside the vs row, drop its block-level chrome. */
+.mdc-rate-vs .mdc-rate-win {
+  border: 1px solid var(--goldline);
+  background: var(--card2);
+  border-left: 2px solid var(--gold);
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  min-width: 56px;
+}
+.mdc-rate-vs .mdc-rate-win-num {
+  font-size: 16px;
+  line-height: 1;
+}
+.mdc-rate-vs .mdc-rate-win-lbl {
+  margin-top: 1px;
+}
+
+/* ---- head-to-head rating card: bars face each other, win% in middle ---- */
+.mdc-rate-vs {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin-top: 4px;
+}
+.mdc-rate-side {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mdc-rate-side-ally {
+  align-items: stretch;
+}
+.mdc-rate-side-enemy {
+  align-items: stretch;
+}
+.mdc-rate-side-lbl {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+}
+.mdc-rate-side-ally .mdc-rate-side-lbl {
+  color: #93c5fd;
+}
+.mdc-rate-side-enemy .mdc-rate-side-lbl {
+  color: #fca5a5;
+}
+.mdc-rate-num {
+  font-size: 20px;
+  text-align: center;
+  line-height: 1;
+}
+
+/* Ally bar: fills from RIGHT (toward center win%). Enemy bar: fills from LEFT.
+   Direction is handled by flex `justify-content` on the parent .mdc-score
+   (scoped to .mdc-rate-vs above) — the <i> width then flows from the
+   anchored edge. */
+.mdc-bar-ally > i {
+  background: linear-gradient(270deg, var(--gold-deep), var(--gold));
+  border-radius: 3px 0 0 3px;
+}
+.mdc-bar-enemy > i {
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  border-radius: 0 3px 3px 0;
+}
+/* Leading side gets a brighter bar + glow. */
+.mdc-bar-lead {
+  border: 1px solid rgba(251, 191, 36, 0.6);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.25);
+}
+.mdc-bar-enemy.mdc-bar-lead {
+  border-color: rgba(248, 113, 113, 0.6);
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.25);
+}
+
+/* Win% chip — center verdict. Color hints at who's favored. */
+.mdc-rate-win {
+  border: 1px solid var(--goldline);
+  background: var(--card2);
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin: 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  gap: 0;
+}
+.mdc-rate-win-num {
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--gold);
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+  line-height: 1;
+}
+.mdc-rate-win-lbl {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--gold);
+  opacity: 0.75;
+  margin-top: 2px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.mdc-win-ally {
+  border-color: rgba(110, 231, 183, 0.6);
+  background: linear-gradient(180deg, rgba(110, 231, 183, 0.12), var(--card2));
+}
+.mdc-win-ally .mdc-rate-win-num {
+  color: #6ee7b7;
+  text-shadow: 0 0 10px rgba(110, 231, 183, 0.4);
+}
+.mdc-win-ally .mdc-rate-win-lbl {
+  color: #6ee7b7;
+}
+.mdc-win-enemy {
+  border-color: rgba(248, 113, 113, 0.6);
+  background: linear-gradient(180deg, rgba(248, 113, 113, 0.12), var(--card2));
+}
+.mdc-win-enemy .mdc-rate-win-num {
+  color: #f87171;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.4);
+}
+.mdc-win-enemy .mdc-rate-win-lbl {
+  color: #f87171;
+}
+.mdc-win-tie {
+  border-color: var(--goldline);
+}
+
+/* Lock the vertical order in both rating sides: label -> bar -> number.
+   Markup for ally is already label/bar/num; enemy markup is num/bar/label,
+   so order: forces the same visual stack on both. */
+.mdc-rate-side > .mdc-rate-side-lbl {
+  order: 0;
+}
+.mdc-rate-side > .mdc-score {
+  order: 1;
+}
+.mdc-rate-side > .mdc-rate-num {
+  order: 2;
+}
+
+/* Bars face each other: ally fill grows from the right edge (toward center),
+   enemy fill grows from the left edge (toward center). Without these flex
+   rules, .mdc-score is a block and <i> with inline width fills left-to-right
+   on both sides — the visual mirror breaks. */
+.mdc-rate-vs .mdc-bar-ally {
+  display: flex;
+  justify-content: flex-end;
+}
+.mdc-rate-vs .mdc-bar-enemy {
+  display: flex;
+  justify-content: flex-start;
+}
+/* Width now flows from the correct edge: width:72% on ally means fill the
+   rightmost 72% of the rail (gold gradient tail touches the win% chip).
+   Width:72% on enemy means fill the leftmost 72% (red head touches the chip). */

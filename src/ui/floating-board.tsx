@@ -17,6 +17,7 @@ interface FloatingBoardProps {
   onRemove: (side: Side, id: string) => void;
   allyRating: number;
   enemyRating: number;
+  winPct: number;
   /**
    * Ref to the outer <aside>. App uses this to publish the rendered height
    * into a CSS var (`--mdc-fb-h`) so HeroRows can apply `scroll-margin-top`
@@ -117,7 +118,6 @@ export function FloatingBoard(p: FloatingBoardProps) {
   }
   return (
     <aside className="mdc-fb" aria-label="Draft summary" ref={p.rootRef}>
-      <span className="mdc-fb-rate mdc-fb-rate-ally">{p.allyRating}</span>
       <MiniSide
         ids={p.allies}
         banIds={p.ourBans}
@@ -129,6 +129,16 @@ export function FloatingBoard(p: FloatingBoardProps) {
         removeWord={p.removeWord}
         onRemove={p.onRemove}
       />
+      <span className="mdc-fb-power mdc-fb-power-ally" title={`${p.allyRating}`}>
+        {p.allyRating}
+      </span>
+      <span className="mdc-fb-win" title={`Chance to win ${p.winPct}%`}>
+        <b className="mdc-fb-win-num">{p.winPct}%</b>
+        <span className="mdc-fb-win-lbl">WIN</span>
+      </span>
+      <span className="mdc-fb-power mdc-fb-power-enemy" title={`${p.enemyRating}`}>
+        {p.enemyRating}
+      </span>
       <MiniSide
         ids={p.enemies}
         banIds={p.enemyBans}
@@ -140,7 +150,6 @@ export function FloatingBoard(p: FloatingBoardProps) {
         removeWord={p.removeWord}
         onRemove={p.onRemove}
       />
-      <span className="mdc-fb-rate mdc-fb-rate-enemy">{p.enemyRating}</span>
     </aside>
   );
 }

@@ -1,9 +1,9 @@
 name: CI
 
-# Runs on every push to main and on every pull request.
+# PR-only gate. Pushes to main are validated by deploy-cloudflare.yml's
+# `verify` job, which runs lint + test before deploying, so a duplicate
+# CI run on every push would just re-do the same work.
 on:
-  push:
-    branches: [main]
   pull_request:
   workflow_dispatch:
 

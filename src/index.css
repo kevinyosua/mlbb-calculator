@@ -409,8 +409,14 @@ select {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 3px;
-  margin-left: 4px;
-  vertical-align: middle;
+  /* Badges wrap to their own full-width line under the name instead of
+     stealing width from it. Unbreakable chips (nowrap) otherwise squeeze
+     .mdc-uname down to a 40px sliver at 390px viewport with 3 counters.
+     order:1 keeps the chevron (later in DOM) on the first line, far right. */
+  flex: 1 1 100%;
+  order: 1;
+  margin: 4px 0 0;
+  min-width: 0;
 }
 .mdc-tags {
   display: flex;
@@ -428,6 +434,8 @@ select {
 .mdc-rowbtn {
   display: flex;
   align-items: center;
+  /* Let .mdc-inline-tags claim a full row for itself (flex-basis 100%). */
+  flex-wrap: wrap;
   gap: 8px;
   width: 100%;
   background: none;
@@ -440,6 +448,7 @@ select {
 }
 .mdc-uname {
   flex: 1;
+  min-width: 0;
   font-size: 14px;
 }
 .mdc-bignum {

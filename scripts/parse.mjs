@@ -27,11 +27,27 @@ export const normalizeRole = (raw) => {
 
 // Guard: name is valid when non-empty and not a navigation word (the "Heroes" bug).
 const NAV_WORDS = new Set(['Heroes', 'Build', 'Guide', 'Counter']);
-export const isValidHeroName = (name) => typeof name === 'string' && name.trim().length > 1 && !NAV_WORDS.has(name.trim());
+// A scraped title can still carry raw HTML entities (`Chang&#x27;e`). Rejecting
+// them here keeps a decode regression from silently shipping into heroes.json.
+const ENTITY_RE = /&(?:#\d+|#x[\da-f]+|[a-z][a-z\d]*);/i;
+export const isValidHeroName = (name) =>
+  typeof name === 'string' && name.trim().length > 1 && !NAV_WORDS.has(name.trim()) && !ENTITY_RE.test(name);
+
+// `<title>` is scraped HTML, so common entities must be decoded before the name
+// reaches heroes.json (otherwise `Chang&#x27;e` renders literally in the UI).
+const NAMED_ENTITIES = { amp: '&', apos: "'", quot: '"', lt: '<', gt: '>', nbsp: ' ' };
+export const decodeEntities = (s) =>
+  typeof s !== 'string'
+    ? s
+    : s.replace(/&(?:#(\d+)|#x([\da-f]+)|([a-z][a-z\d]*));/gi, (whole, dec, hex, named) => {
+        if (dec) return String.fromCodePoint(Number(dec));
+        if (hex) return String.fromCodePoint(Number.parseInt(hex, 16));
+        return NAMED_ENTITIES[named.toLowerCase()] ?? whole;
+      });
 
 export function parseHeroPage(html, slug) {
   const titleM = html.match(/<title>MLBB (.+?) Build,/);
-  const rawName = titleM ? titleM[1].trim() : heroNameFallback(slug);
+  const rawName = decodeEntities(titleM ? titleM[1].trim() : heroNameFallback(slug));
   const name = isValidHeroName(rawName) ? rawName : heroNameFallback(slug);
   const roleM = html.match(/href="\/roles\/([a-z]+)"/);
   const role = normalizeRole(roleM?.[1]);

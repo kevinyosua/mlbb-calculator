@@ -9,6 +9,7 @@ import {
   heroNameFallback,
   isValidHeroName,
   isValidSlug,
+  decodeEntities,
   isAllowedIconUrl,
   tierScore,
   ppToScore,
@@ -47,6 +48,26 @@ describe('scripts/parse', () => {
     expect(isValidHeroName('Heroes')).toBe(false);
     expect(isValidHeroName('')).toBe(false);
     expect(isValidHeroName('Kaja')).toBe(true);
+  });
+  it('isValidHeroName tolak entitas HTML yang belum didekode', () => {
+    expect(isValidHeroName('Chang&#x27;e')).toBe(false);
+    expect(isValidHeroName('A&amp;B')).toBe(false);
+    expect(isValidHeroName("Chang'e")).toBe(true);
+  });
+  it('decodeEntities pulihkan nama hero dengan apostrof (regresi Chang&#x27;e)', () => {
+    expect(decodeEntities('Chang&#x27;e')).toBe("Chang'e");
+    expect(decodeEntities('Chang&#39;e')).toBe("Chang'e");
+    expect(decodeEntities('A &amp; B')).toBe('A & B');
+    expect(decodeEntities('&quot;x&quot;')).toBe('"x"');
+    expect(decodeEntities('&#128512;')).toBe('\u{1F600}');
+    expect(decodeEntities('plain')).toBe('plain');
+    // entitas tak dikenal dibiarkan apa adanya, bukan dihapus
+    expect(decodeEntities('a &bogus; b')).toBe('a &bogus; b');
+  });
+  it('parseHeroPage dekode entitas pada title', () => {
+    const html =
+      '<html><head><title>MLBB Chang&#x27;e Build, Guide</title></head><body><a href="/roles/mage">x</a>How to Build X in Mobile Legends: Mid</body></html>';
+    expect(parseHeroPage(html, 'change').name).toBe("Chang'e");
   });
   it('isValidSlug tolak path traversal + metakarakter shell', () => {
     expect(isValidSlug('yu-zhong')).toBe(true);

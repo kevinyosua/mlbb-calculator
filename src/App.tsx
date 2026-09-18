@@ -8,6 +8,7 @@ import { STR, type Lang } from './i18n';
 import { reportError, useLastError } from './ui/errors';
 import { FilterBar } from './ui/filter';
 import { FloatingBoard } from './ui/floating-board';
+import { useKeyboardInset } from './ui/keyboard';
 import { HeroRows, SuggestPair } from './ui/rows';
 import { DraftBoard } from './ui/slots';
 import { ALL_LANE, ALL_ROLE, MAX_LINE, type Side } from './ui/theme';
@@ -40,6 +41,8 @@ export default function App() {
   const fbRef = useRef<HTMLElement>(null);
   const [boardVisible, setBoardVisible] = useState(true);
   const firstRender = useRef(true);
+  // Keep sticky bottom chrome (FilterBar) above the virtual keyboard on mobile.
+  useKeyboardInset();
   // Keep page pinned to top on first paint — the sticky-bottom filter bar would otherwise
   // trick the browser into scrolling past the hero list to make it visible.
   useEffect(() => {

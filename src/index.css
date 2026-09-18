@@ -23,7 +23,9 @@
 
 html {
   --mdc-scroll-pad: 120px;
-  scroll-padding-bottom: calc(var(--mdc-scroll-pad) + env(safe-area-inset-bottom));
+  /* Keyboard inset published by useKeyboardInset() (visualViewport delta). */
+  --mdc-kb: 0px;
+  scroll-padding-bottom: calc(var(--mdc-scroll-pad) + var(--mdc-kb) + env(safe-area-inset-bottom));
   /* Sticky-bottom filter bar can shift the viewport anchor on first paint;
      disable anchoring so layout changes don't yank the user away from top. */
   overflow-anchor: none;
@@ -517,7 +519,9 @@ select {
 }
 .mdc-filterbar {
   position: sticky;
-  bottom: calc(8px + env(safe-area-inset-bottom));
+  /* --mdc-kb lifts the bar above the virtual keyboard; env() alone only
+     covers the home indicator, never the keyboard. */
+  bottom: calc(8px + var(--mdc-kb) + env(safe-area-inset-bottom));
   z-index: 40;
   margin-top: 8px;
   background: var(--card);
@@ -540,7 +544,9 @@ select {
 .mdc-frow input,
 .mdc-frow select {
   min-width: 0;
-  font-size: 0.875em;
+  /* iOS Safari auto-zooms when a focused control's used font-size is < 16px,
+     and never zooms back out. Keep 16px here; do NOT shrink below it. */
+  font-size: 16px;
   padding: 4px 6px;
 }
 .mdc-frow input {
@@ -561,7 +567,7 @@ select {
 }
 .mdc-filter-closed {
   position: sticky;
-  bottom: calc(12px + env(safe-area-inset-bottom));
+  bottom: calc(12px + var(--mdc-kb) + env(safe-area-inset-bottom));
   z-index: 40;
   display: flex;
   justify-content: flex-end;

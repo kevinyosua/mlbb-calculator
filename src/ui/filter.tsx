@@ -69,10 +69,17 @@ export function FilterBar(p: FilterProps) {
         <input
           ref={p.qRef}
           id="mdc-q"
+          name="q"
+          type="search"
           value={p.q}
           onChange={(e) => p.onQ(e.target.value)}
           placeholder={p.labels.search}
           enterKeyHint="search"
+          inputMode="search"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="none"
+          spellCheck={false}
           className="mdc-grow"
         />
         {p.dirty && (

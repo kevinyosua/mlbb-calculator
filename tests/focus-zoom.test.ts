@@ -43,3 +43,69 @@ describe('iOS focus-zoom guard', () => {
     }
   });
 });
+
+const filterTsx = fs.readFileSync(new URL('../src/ui/filter.tsx', import.meta.url), 'utf8');
+
+/**
+ * The filter bar floats above the bottom edge, so any bottom margin on the bar
+ * itself reads as a dead gap under the sticky chrome. The app's own
+ * padding-bottom is the only bottom spacing it gets.
+ */
+describe('filter bar sits flush to the bottom', () => {
+  // Fixed pattern: selector is a literal, so no dynamic regex is built.
+  const blockAfter = (haystack: string, literals: string[]) => {
+    for (const lit of literals) {
+      const at = haystack.indexOf(`${lit} {`);
+      if (at === -1) continue;
+      const open = haystack.indexOf('{', at);
+      const close = haystack.indexOf('}', open);
+      if (open !== -1 && close !== -1) return haystack.slice(open + 1, close);
+    }
+    return '';
+  };
+
+  it('.mdc-filterbar declares no bottom margin', () => {
+    const body = blockAfter(css, ['.mdc-filterbar']);
+    expect(body).not.toBe('');
+    // `margin: <top> <sides> <bottom>` shorthand must end in 0 / 0px.
+    const shorthand = /margin:\s*([^;]+);/.exec(body)?.[1].trim();
+    if (shorthand) {
+      const parts = shorthand.split(/\s+/);
+      const bottom = parts[2] ?? parts[0];
+      expect(['0', '0px']).toContain(bottom);
+    }
+    const mb = /margin-bottom:\s*([^;]+);/.exec(body)?.[1].trim();
+    if (mb) expect(['0', '0px']).toContain(mb);
+  });
+
+  it('.mdc-filter-closed declares no bottom margin', () => {
+    const body = blockAfter(css, ['.mdc-filter-closed']);
+    expect(body).not.toBe('');
+    const mb = /margin-bottom:\s*([^;]+);/.exec(body)?.[1].trim();
+    if (mb) expect(['0', '0px']).toContain(mb);
+  });
+});
+
+/**
+ * Regression: `Lane: All Lane` / `Role: All Role` measured ~116px at 16px,
+ * overflowing the ~115px slot each select gets at a 390px viewport — that was
+ * the "squeezed" text, not the font size. The empty option now names the field
+ * alone and the accessible name lives on aria-label / a visually-hidden label.
+ */
+describe('filter option labels stay short', () => {
+  it('no option text re-states the field name as a colon prefix', () => {
+    expect(filterTsx).not.toMatch(/[`'"]Lane: /);
+    expect(filterTsx).not.toMatch(/[`'"]Role: /);
+  });
+
+  it('every select keeps an accessible name', () => {
+    const ids = ['mdc-lane', 'mdc-role', 'mdc-tier'];
+    for (const id of ids) {
+      // Fixed scan: locate the literal id, then look for aria-label nearby.
+      const at = filterTsx.indexOf(`id="${id}"`);
+      expect(at, `select #${id} not found`).toBeGreaterThan(-1);
+      const slice = filterTsx.slice(at, at + 400);
+      expect(slice.includes('aria-label="'), `select #${id} has no aria-label`).toBe(true);
+    }
+  });
+});

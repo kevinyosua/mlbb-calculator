@@ -256,7 +256,7 @@ select {
   min-height: 100svh;
   max-width: 640px;
   margin: 0 auto;
-  padding: 12px 12px calc(16px + env(safe-area-inset-bottom));
+  padding: 12px 12px calc(4px + env(safe-area-inset-bottom));
   font-family: system-ui;
 }
 .mdc-topbar {
@@ -523,38 +523,42 @@ select {
      covers the home indicator, never the keyboard. */
   bottom: calc(8px + var(--mdc-kb) + env(safe-area-inset-bottom));
   z-index: 40;
-  margin-top: 8px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 6px;
+  padding: 4px 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
   max-height: min(48svh, 320px);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+  /* The floating bar is a fixed-height island; let HeroRows flow up to it
+     instead of leaving an awkward gap at the bottom of the document. */
+  margin: 4px 0 0;
 }
 .mdc-frow {
   align-items: center;
   gap: 4px;
 }
 .mdc-frow + .mdc-frow {
-  margin-top: 4px;
+  margin-top: 3px;
 }
-.mdc-frow input,
-.mdc-frow select {
-  min-width: 0;
-  /* iOS Safari auto-zooms when a focused control's used font-size is < 16px,
-     and never zooms back out. Keep 16px here; do NOT shrink below it. */
+/* iOS Safari auto-zooms when a focused control's used font-size is < 16px,
+   and never zooms back out. This applies to <select> as well as <input>, so
+   both stay at 16px. The squeeze was never the font size — it was the verbose
+   "Role: All Role" option (116px at 16px) overflowing a 115px slot at 390px.
+   Options are now self-describing and short ("Lane", "Role", "Tier",
+   "Tier S"), longest real value "Marksman" ~67px. */
+.mdc-frow input {
+  height: 1.2em;
   font-size: 16px;
   padding: 4px 6px;
 }
-.mdc-frow input {
-  height: 1.2em;
-}
 .mdc-frow select {
+  min-width: 0;
+  font-size: 16px;
+  padding: 3px 6px;
   text-overflow: ellipsis;
-  height: 1.2em;
 }
 .mdc-iconbtn {
   flex-shrink: 0;
@@ -567,11 +571,11 @@ select {
 }
 .mdc-filter-closed {
   position: sticky;
-  bottom: calc(12px + var(--mdc-kb) + env(safe-area-inset-bottom));
+  bottom: calc(8px + var(--mdc-kb) + env(safe-area-inset-bottom));
   z-index: 40;
   display: flex;
   justify-content: flex-end;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .mdc-fabbtn {
   display: inline-flex;

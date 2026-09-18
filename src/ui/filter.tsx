@@ -112,7 +112,7 @@ export function FilterBar(p: FilterProps) {
         <select id="mdc-lane" value={p.lane} onChange={(e) => p.onLane(e.target.value)} aria-label="Lane" className="mdc-grow">
           {p.lanes.map((r) => (
             <option key={r} value={r}>
-              {r === ALL_LANE ? `Lane: ${r}` : r}
+              {r === ALL_LANE ? 'Lane' : r}
             </option>
           ))}
         </select>
@@ -122,7 +122,7 @@ export function FilterBar(p: FilterProps) {
         <select id="mdc-role" value={p.role} onChange={(e) => p.onRole(e.target.value)} aria-label="Role" className="mdc-grow">
           {p.roles.map((r) => (
             <option key={r} value={r}>
-              {r === ALL_ROLE ? `Role: ${r}` : r}
+              {r === ALL_ROLE ? 'Role' : r}
             </option>
           ))}
         </select>
@@ -141,10 +141,10 @@ export function FilterBar(p: FilterProps) {
           aria-label="Tier"
           className={`mdc-grow${p.tier ? ` mdc-tier${p.tier}` : ''}`}
         >
-          <option value="">Tier: {p.labels.all}</option>
+          <option value="">Tier</option>
           {(['S', 'A', 'B', 'C', 'D'] as const).map((tr) => (
             <option key={tr} value={tr}>
-              Tier {tr}
+              {`Tier ${tr}`}
             </option>
           ))}
         </select>

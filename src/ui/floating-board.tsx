@@ -118,38 +118,44 @@ export function FloatingBoard(p: FloatingBoardProps) {
   }
   return (
     <aside className="mdc-fb" aria-label="Draft summary" ref={p.rootRef}>
-      <MiniSide
-        ids={p.allies}
-        banIds={p.ourBans}
-        side="ally"
-        max={p.max}
-        heroes={p.heroes}
-        meta={p.meta}
-        lang={p.lang}
-        removeWord={p.removeWord}
-        onRemove={p.onRemove}
-      />
-      <span className="mdc-fb-power mdc-fb-power-ally" title={`${p.allyRating}`}>
-        {p.allyRating}
-      </span>
-      <span className="mdc-fb-win" title={`Chance to win ${p.winPct}%`}>
-        <b className="mdc-fb-win-num">{p.winPct}%</b>
-        <span className="mdc-fb-win-lbl">WIN</span>
-      </span>
-      <span className="mdc-fb-power mdc-fb-power-enemy" title={`${p.enemyRating}`}>
-        {p.enemyRating}
-      </span>
-      <MiniSide
-        ids={p.enemies}
-        banIds={p.enemyBans}
-        side="enemy"
-        max={p.max}
-        heroes={p.heroes}
-        meta={p.meta}
-        lang={p.lang}
-        removeWord={p.removeWord}
-        onRemove={p.onRemove}
-      />
+      <div className="mdc-fb-sides">
+        <MiniSide
+          ids={p.allies}
+          banIds={p.ourBans}
+          side="ally"
+          max={p.max}
+          heroes={p.heroes}
+          meta={p.meta}
+          lang={p.lang}
+          removeWord={p.removeWord}
+          onRemove={p.onRemove}
+        />
+        <MiniSide
+          ids={p.enemies}
+          banIds={p.enemyBans}
+          side="enemy"
+          max={p.max}
+          heroes={p.heroes}
+          meta={p.meta}
+          lang={p.lang}
+          removeWord={p.removeWord}
+          onRemove={p.onRemove}
+        />
+      </div>
+      <div className="mdc-fb-stats" role="group" aria-label="Power and win chance">
+        <span className="mdc-fb-stat mdc-fb-power-ally" title={`Ally power ${p.allyRating}`}>
+          <span className="mdc-fb-stat-lbl">ALLY</span>
+          <b className="mdc-fb-stat-num">{p.allyRating}</b>
+        </span>
+        <span className="mdc-fb-stat mdc-fb-stat-win" title={`Chance to win ${p.winPct}%`}>
+          <b className="mdc-fb-stat-num">{p.winPct}%</b>
+          <span className="mdc-fb-stat-lbl">WIN</span>
+        </span>
+        <span className="mdc-fb-stat mdc-fb-power-enemy" title={`Enemy power ${p.enemyRating}`}>
+          <span className="mdc-fb-stat-lbl">ENEMY</span>
+          <b className="mdc-fb-stat-num">{p.enemyRating}</b>
+        </span>
+      </div>
     </aside>
   );
 }

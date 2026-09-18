@@ -176,9 +176,16 @@ select {
 .mdc-avatarbtn {
   background: none;
   border: none;
-  padding: 4px;
-  margin: -4px;
+  padding: 0;
+  margin: 0;
   min-height: 0;
+  /* Match dynamic avatar size on the container, clamped for tiny screens. */
+  width: var(--slot-size, auto);
+  height: var(--slot-size, auto);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .mdc-side-blue {
@@ -196,15 +203,15 @@ select {
   color: #fca5a5;
 }
 .mdc-slot {
-  width: 44px;
-  height: 44px;
+  width: var(--slot-size, 44px);
+  height: var(--slot-size, 44px);
   border-radius: 50%;
   border: 1px dashed #3b4d7d;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: #3b4d7d;
-  font-size: 11px;
+  font-size: clamp(10px, 4cqi, 13px);
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -291,10 +298,15 @@ select {
   gap: 8px;
 }
 .mdc-wrap44 {
+  /* Container query scope: pick/ban rows compute their own avatar/slot
+     size from the column width so 5 picks + 5 bans fit without horizontal
+     scroll on narrow viewports. --slot-size derives from inline-size. */
+  container-type: inline-size;
+  --slot-size: clamp(24px, calc((100cqi - 32px) / 5), 44px);
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  min-height: 44px;
+  min-height: var(--slot-size, 44px);
 }
 .mdc-mt4 {
   margin-top: 4px;
@@ -571,8 +583,11 @@ select {
 }
 
 .mdc-avatar {
-  width: var(--av-size, 36px);
-  height: var(--av-size, 36px);
+  /* --slot-size wins when set by container query (DraftBoard / floating
+     board picks row), --av-size wins when caller passes an explicit prop
+     (e.g. HeroRows). Fallback to 36px only outside both contexts. */
+  width: var(--slot-size, var(--av-size, 36px));
+  height: var(--slot-size, var(--av-size, 36px));
   border-radius: 50%;
   background: var(--av-bg, #888);
   color: #fff;
@@ -647,11 +662,21 @@ select {
   padding: 6px 10px;
   margin: 0 -12px 8px;
   display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.mdc-fb-sides {
+  display: flex;
   flex-direction: row;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 .mdc-fb-side {
+  /* Container query scope so pick/ban avatars shrink with available
+     width — 5 picks + 5 bans per side must fit a half-viewport row. */
+  container-type: inline-size;
+  --slot-size: clamp(20px, calc((100cqi - 24px) / 5), 32px);
   display: flex;
   flex: 1 1 0;
   min-width: 0;
@@ -660,9 +685,10 @@ select {
 }
 .mdc-fb-row {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
-  min-height: 32px;
+  justify-content: center;
+  min-height: var(--slot-size, 32px);
 }
 .mdc-fb-bans {
   opacity: 0.75;
@@ -689,19 +715,16 @@ select {
   padding-right: 4px;
 }
 .mdc-fb-empty {
-  width: 28px;
-  height: 28px;
+  width: var(--slot-size, 28px);
+  height: var(--slot-size, 28px);
   border-radius: 50%;
   border: 1px dashed #3b4d7d;
   opacity: 0.45;
+  flex-shrink: 0;
 }
 @media (max-width: 360px) {
   .mdc-fb-side {
     gap: 4px;
-  }
-  .mdc-fb-empty {
-    width: 20px;
-    height: 20px;
   }
 }
 
@@ -775,17 +798,6 @@ select {
   color: var(--muted);
 }
 
-/* Centered win% pill between the two sides on the floating board. */
-.mdc-fb-win {
-  font-variant-numeric: tabular-nums;
-  font-weight: 800;
-  font-size: 0.95em;
-  color: var(--gold);
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
-  padding: 0 4px;
-  flex-shrink: 0;
-}
-
 /* "Chance to Win" label sits next to the big number so the unit is unmistakable. */
 .mdc-rate-win-lbl {
   font-size: 11px;
@@ -794,32 +806,6 @@ select {
   text-transform: uppercase;
   color: var(--gold);
   opacity: 0.85;
-}
-
-/* Floating-board win% — two-line block: huge number, tiny "WIN" label. */
-.mdc-fb-win {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-  padding: 0 6px;
-  min-width: 48px;
-}
-.mdc-fb-win-num {
-  font-size: 18px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: var(--gold);
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
-  line-height: 1;
-}
-.mdc-fb-win-lbl {
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  color: var(--gold);
-  opacity: 0.7;
-  margin-top: 2px;
 }
 
 /* ---- ally vs enemy on one row, win% below ---- */
@@ -864,20 +850,53 @@ select {
   padding: 0 2px;
 }
 
-/* Ally/enemy power chips flanking the win% on the floating board. */
-.mdc-fb-power {
+/* Floating-board stats row: ally power, win%, enemy power, all centered
+   under the picks/bans row. Small, readable, equal-weight layout. */
+.mdc-fb-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 2px;
+  padding: 2px 4px;
+}
+.mdc-fb-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  font-size: 0.85em;
-  padding: 0 4px;
-  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.mdc-fb-stat-lbl {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   opacity: 0.75;
+}
+.mdc-fb-stat-num {
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 .mdc-fb-power-ally {
   color: var(--blue);
 }
 .mdc-fb-power-enemy {
   color: var(--red);
+}
+.mdc-fb-stat-win {
+  color: var(--gold);
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.35);
+}
+.mdc-fb-stat-win .mdc-fb-stat-num {
+  font-size: 14px;
 }
 
 /* When the win% chip sits inside the vs row, drop its block-level chrome. */

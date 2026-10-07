@@ -5,7 +5,9 @@
 // without monkey-patching global fetch.
 //
 // Sources, in priority order:
-//   1. CLI argument (process.argv[2]).
+//   1. CLI positional argument, flags ignored (process.argv[2]).
+//      `--force` / `-f` never counts as a patch label; read it separately
+//      with hasForceFlag() (data-update.mjs force mode).
 //   2. PATCH_LABEL environment variable.
 //   3. mlbbhub.com /statistics page (scraped).
 //   4. Last patch label written into data/heroes.json by the previous run.
@@ -67,6 +69,23 @@ export function parsePatchFromHtml(html) {
 
 export const DEFAULT_FALLBACK_PATCH = '2.1.95a';
 
+// Force mode for data:update: rewrite meta even when the patch label is
+// unchanged and no new heroes exist. Default (no flag) skips the rewrite so
+// daily upstream rate drift on the same patch does not spam sync PRs.
+export function shouldSkipUpdate({ existingPatch, patch, newHeroCount, force }) {
+  return !force && existingPatch === patch && newHeroCount === 0;
+}
+
+export function hasForceFlag(argv = process.argv) {
+  const args = Array.isArray(argv) ? argv : process.argv;
+  return args.includes('--force') || args.includes('-f');
+}
+
+export function patchArgFromArgv(argv = process.argv) {
+  const args = Array.isArray(argv) ? argv.slice(2) : [];
+  return args.find((a) => a !== '--force' && a !== '-f' && !a.startsWith('-'));
+}
+
 export async function resolvePatch({
   argv = process.argv,
   env = process.env,
@@ -74,7 +93,7 @@ export async function resolvePatch({
   existingPaths,
   fallback = DEFAULT_FALLBACK_PATCH,
 } = {}) {
-  const cliArg = argv[2];
+  const cliArg = patchArgFromArgv(argv);
   if (cliArg) return { patch: cliArg, source: 'cli' };
 
   const envArg = env.PATCH_LABEL;

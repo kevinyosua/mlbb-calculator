@@ -79,6 +79,35 @@ export const isValidCounter = (c) =>
 // Proven +pp -> score 0-100.
 export const ppToScore = (pp) => Math.min(10, Math.round(5 + pp));
 
+// Counter key for conflict checks: one row per source>target:type.
+export const counterKey = (c) => `${c.source}>${c.target}:${c.type}`;
+
+// Scraped rows carry exactly ['measured']; anything else is hand-written seed.
+export const isScrapedRow = (c) =>
+  Array.isArray(c.tags) && c.tags.length === 1 && c.tags[0] === 'measured';
+
+// Keep first row per key (hand rows first, so seed wins ties).
+export function dedupeCounters(rows) {
+  const seen = new Set();
+  return rows.filter((c) => {
+    const k = counterKey(c);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+// Deterministic row order: byte-compare on counterKey (no locale drift).
+// Restructured every counters:update write so git diff stays line-oriented.
+export function sortCounters(rows) {
+  return [...rows].sort((a, b) => {
+    const ka = counterKey(a);
+    const kb = counterKey(b);
+    if (ka === kb) return 0;
+    return ka < kb ? -1 : 1;
+  });
+}
+
 // Guard: meta row is valid.
 export const isValidMeta = (m) =>
   m &&

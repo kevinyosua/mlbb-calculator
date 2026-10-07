@@ -18,6 +18,12 @@ on:
         default: "true"
         type: choice
         options: ["true", "false"]
+      force:
+        description: "Force rewrite meta when patch unchanged"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
 
 permissions:
   contents: write
@@ -117,8 +123,14 @@ jobs:
               n=$((n+1))
             done
           }
-          attempt "pnpm run data:update"
-          attempt "pnpm run counters:update"
+          FORCE_ARGS=""
+          if [ "${{ inputs.force }}" = "true" ]; then
+            FORCE_ARGS="-- --force"
+          fi
+          PATCH_ARG="${{ steps.dryrun.outputs.DRYRUN_PATCH }}"
+          # shellcheck disable=SC2086
+          attempt "pnpm run data:update $FORCE_ARGS"
+          attempt "pnpm run counters:update $PATCH_ARG"
           attempt "pnpm run icons:cache"
           set -e
 

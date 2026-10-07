@@ -177,7 +177,8 @@ Just tools run now and then. App itself never downloads anything.
 2. "Proven Counters" with +pp → `COUNTER` rows (score = `min(10, round(5 + pp))`)
 3. "Strong Against" → `COUNTERED_BY` rows (victim-first, score 6)
 4. Skips conflicts with hand-written rows (preserves M1 seed data)
-5. Validates all rows before writing
+5. Rebuilds scraped `measured` rows fresh each run (re-scrape = update, not conflict)
+6. Dedupes by `source>target:type`, validates all rows before writing
 
 ## What is not done yet
 

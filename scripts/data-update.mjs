@@ -2,15 +2,18 @@ import fs from 'node:fs';
 import { parseHeroPage, isValidSlug, tierScore } from './parse.mjs';
 import { fetchWithUA } from './http.mjs';
 import { cacheIcons } from './cache-icons.mjs';
-import { resolvePatch } from './patch-source.mjs';
+import { resolvePatch, hasForceFlag, shouldSkipUpdate } from './patch-source.mjs';
 
-// pnpm data:update — sync data from mlbbhub (community source).
+// pnpm data:update [--force|-f] [patch] — sync data from mlbbhub (community source).
 // 1. Heroes new to the API -> append to heroes.json (name/role/lane/icon scraped from the hero page).
 // 2. Rewrite meta.json for every hero.
+// Force mode: `pnpm data:update -- --force` (atau `-f`) paksa tulis ulang meta
+// meski patch sama dan tanpa hero baru. Default tanpa flag skip tulis ulang
+// biar drift harian di patch sama tidak spam PR sync.
 // New heroes get the NoData tag (neutral scores, no counters) — counters are filled in by hand over time.
 // Patch label resolution lives in ./patch-source.mjs so it can be unit
 // tested without side effects. Sources, in priority order:
-//   1. CLI argument: pnpm data:update 2.1.96
+//   1. CLI positional argument, flags ignored: pnpm data:update 2.1.96 [--force]
 //   2. PATCH_LABEL environment variable (CI override).
 //   3. Scrape the current patch from https://mlbbhub.com/statistics.
 //   4. Last patch label written into data/heroes.json by the previous run.
@@ -26,8 +29,9 @@ function readJson(p) {
   }
 }
 
+const force = hasForceFlag();
 const { patch, source } = await resolvePatch({ fetcher: fetchWithUA });
-process.stdout.write(`patch source: ${source} -> ${patch}\n`);
+process.stdout.write(`patch source: ${source} -> ${patch}${force ? ' (force)' : ''}\n`);
 const heroes = readJson('./data/heroes.json');
 const have = new Set(heroes.map((h) => h.id));
 
@@ -41,6 +45,14 @@ const bySlug = new Map(json.heroes.map((h) => [h.slug, h]));
 // hero id, so anything that is not a plain slug is skipped (never fetched).
 const missing = [...bySlug.keys()].filter((s) => !have.has(s) && isValidSlug(s));
 const rejected = [...bySlug.keys()].filter((s) => !have.has(s) && !isValidSlug(s));
+const existingPatch = heroes[0]?.patch ?? null;
+if (shouldSkipUpdate({ existingPatch, patch, newHeroCount: missing.length, force })) {
+  process.stdout.write(`skip: patch ${patch} sama, tanpa hero baru. pakai --force untuk paksa tulis ulang.\n`);
+  process.stdout.write(`heroes: ${heroes.length} (+0 baru) patch: ${patch}\n`);
+  process.stdout.write(`slug ditolak (bukan pola slug): ${rejected.join(',') || 'none'}\n`);
+  process.stdout.write(`meta rows: 0 (skip)\n`);
+  process.exit(0);
+}
 let added = 0,
   iconOk = 0;
 const fail = [];

@@ -128,10 +128,12 @@ describe('draft', () => {
     expect(got2.map((s) => s.id)).not.toContain(g2.id);
   });
   it('banPriority blends tier and ban rate (S tier beats A tier at equal ban)', () => {
-    const s = banPriority(byId, 'belerick'); // S, 59.37%
-    const a = banPriority(byId, 'eudora'); // A, 60.12%
-    expect(s).toBeGreaterThan(a);
-    expect(banPriority(byId, 'no-such-hero')).toBe(0);
+    const fx = new Map<string, MetaRow>([
+      ['s-hero', { hero: 's-hero', patch: '2.2.16', win_rate: 55, pick_rate: 10, ban_rate: 59.37, tier: 'S', tier_score: 10 }],
+      ['a-hero', { hero: 'a-hero', patch: '2.2.16', win_rate: 55, pick_rate: 10, ban_rate: 60.12, tier: 'A', tier_score: 8 }],
+    ]);
+    expect(banPriority(fx, 's-hero')).toBeGreaterThan(banPriority(fx, 'a-hero'));
+    expect(banPriority(fx, 'no-such-hero')).toBe(0);
   });
   it('fallbackBans top3 by ban priority desc, honors exclude', () => {
     const top = fallbackBans(heroes, meta, []);

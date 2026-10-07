@@ -15,6 +15,10 @@ import {
   ppToScore,
   isValidCounter,
   isValidMeta,
+  counterKey,
+  isScrapedRow,
+  dedupeCounters,
+  sortCounters,
 } from '../scripts/parse.mjs';
 import { USER_AGENT, buildHeaders } from '../scripts/http.mjs';
 import { cacheIcons } from '../scripts/cache-icons.mjs';
@@ -100,6 +104,25 @@ describe('scripts/parse', () => {
     expect(isValidCounter({ ...ok, score: 101 })).toBe(false);
     expect(isValidCounter({ ...ok, sources: [] })).toBe(false);
     expect(isValidCounter({ ...ok, type: 'BOGUS' })).toBe(false);
+  });
+  it('counterKey stabil untuk cek konflik', () => {
+    const row = { source: 'kaja', target: 'fanny', type: 'COUNTER' };
+    expect(counterKey(row)).toBe('kaja>fanny:COUNTER');
+  });
+  it('isScrapedRow bedakan seed tangan vs hasil scrape', () => {
+    expect(isScrapedRow({ tags: ['measured'] })).toBe(true);
+    expect(isScrapedRow({ tags: ['anti-dash'] })).toBe(false);
+    expect(isScrapedRow({ tags: ['measured', 'x'] })).toBe(false);
+  });
+  it('dedupeCounters simpan baris pertama per key', () => {
+    const a = { source: 'kaja', target: 'fanny', type: 'COUNTER', score: 9 };
+    const b = { ...a, score: 8 };
+    expect(dedupeCounters([a, b])).toEqual([a]);
+  });
+  it('sortCounters urut stabil by key tanpa locale drift', () => {
+    const b = { source: 'kaja', target: 'fanny', type: 'COUNTER' };
+    const a = { source: 'akai', target: 'fanny', type: 'COUNTER' };
+    expect(sortCounters([b, a]).map(counterKey)).toEqual(['akai>fanny:COUNTER', 'kaja>fanny:COUNTER']);
   });
   it('isValidMeta tolak win_rate liar', () => {
     expect(isValidMeta({ hero: 'a', win_rate: 55, tier_score: 8 })).toBe(true);

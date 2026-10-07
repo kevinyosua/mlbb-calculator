@@ -10,7 +10,7 @@ Three workflows run the patch-update pipeline. They share secrets and variables 
 
 ## What `Sync Patch Data` does
 
-1. `pnpm run data:update` — auto-detects the latest patch label from `https://mlbbhub.com/statistics` (scrapes `"Patch X.Y.Z"` from the embedded RSC payload). Falls back to the previous run's `data/heroes.json[0].patch`, then to `'2.1.95a'`. Override by passing the `patch` workflow input.
+1. `pnpm run data:update` — auto-detects the latest patch label from `https://mlbbhub.com/statistics` (scrapes `"Patch X.Y.Z"` from the embedded RSC payload). Falls back to the previous run's `data/heroes.json[0].patch`, then to `'2.1.95a'`. Override by passing the `patch` workflow input. Default skips rewrite when patch unchanged + no new heroes (kills daily drift PR spam); set `force: true` input (`pnpm data:update -- --force` locally) to force meta refresh.
 2. `pnpm run counters:update` — refreshes counter pairs.
 3. `pnpm run icons:cache` — caches new hero icons.
 4. Lint + test.

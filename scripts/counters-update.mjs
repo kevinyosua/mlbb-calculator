@@ -1,6 +1,7 @@
 import fs from 'node:fs';
-import { ppToScore, isValidCounter, isValidSlug } from './parse.mjs';
+import { ppToScore, isValidCounter, isValidSlug, counterKey, isScrapedRow, dedupeCounters, sortCounters } from './parse.mjs';
 import { fetchWithUA } from './http.mjs';
+import { resolvePatch } from './patch-source.mjs';
 
 // pnpm counters:update [patch] — pull /counter/<slug> from mlbbhub for every hero.
 // Proven counters (measured +pp) -> COUNTER (score = min(10, round(5 + pp))).
@@ -8,7 +9,8 @@ import { fetchWithUA } from './http.mjs';
 // target = hero that wins) to match hand-written rows, e.g. page franco
 // listing fanny becomes {source: fanny, target: franco} — franco beats fanny.
 // Hand-written rows win conflicts (the M1 seed data is preserved).
-// Patch label comes from the argument, default 2.1.95a.
+// Patch label via resolvePatch (cli/env/hub/existing/fallback), same as
+// data-update — never hardcoded, so scraped rows carry current patch.
 
 function readJson(p) {
   try {
@@ -19,10 +21,16 @@ function readJson(p) {
   }
 }
 
-const patch = process.argv[2] ?? '2.1.95a';
+const { patch, source } = await resolvePatch({ fetcher: fetchWithUA });
+process.stdout.write(`patch source: ${source} -> ${patch}\n`);
 const heroes = readJson('./data/heroes.json');
-const manual = readJson('./data/counters.json');
-const manualKey = new Set(manual.map((c) => `${c.source}>${c.target}:${c.type}`));
+const stored = readJson('./data/counters.json');
+// Rebuild scraped rows fresh each run: seed is hand rows only. Old scraped
+// rows are dropped, so re-scraping the same matchup is an update, not a
+// conflict (previously every re-run hit skip-konflik ~1879 on stale rows).
+const manual = stored.filter((c) => !isScrapedRow(c));
+const rebuilt = stored.length - manual.length;
+const seen = new Set(manual.map(counterKey));
 
 // Guard: scraped ids only enter the dataset when they name a known hero.
 const heroIds = new Set(heroes.map((h) => h.id));
@@ -46,10 +54,11 @@ for (const h of heroes) {
     for (const m of hits) {
       if (!isKnownHero(m[1])) continue;
       const key = `${m[1]}>${slug}:COUNTER`;
-      if (manualKey.has(key)) {
+      if (seen.has(key)) {
         skipped++;
         continue;
       }
+      seen.add(key);
       const pp = parseFloat(m[2]);
       rows.push({
         source: m[1],
@@ -69,10 +78,11 @@ for (const h of heroes) {
       for (const t of targets) {
         if (!isKnownHero(t)) continue;
         const key = `${t}>${slug}:COUNTERED_BY`;
-        if (manualKey.has(key)) {
+        if (seen.has(key)) {
           skipped++;
           continue;
         }
+        seen.add(key);
         rows.push({
           source: t,
           target: slug,
@@ -92,8 +102,14 @@ for (const h of heroes) {
   await new Promise((r) => setTimeout(r, 150));
 }
 // Guard: drop invalid rows before writing (never poison the data).
-const clean = rows.filter(isValidCounter);
-process.stdout.write(`drop invalid: ${rows.length - clean.length}\n`);
+// Restructure every write: dedupe then stable sort by key, pretty-printed
+// so git diff stays line-oriented instead of one 500KB line.
+const valid = rows.filter(isValidCounter);
+const deduped = dedupeCounters(valid);
+const clean = sortCounters(deduped);
+process.stdout.write(`drop invalid: ${rows.length - valid.length}, drop duplikat: ${valid.length - deduped.length}\n`);
 fs.writeFileSync('./data/counters.json', JSON.stringify(clean));
-process.stdout.write(`rows: ${rows.length} (manual ${manual.length} + proven ${prov} + strong-against ${sa}, skip-konflik ${skipped})\n`);
+process.stdout.write(
+  `rows: ${clean.length} (manual ${manual.length} + proven ${prov} + strong-against ${sa}, skip-konflik ${skipped}, rebuild buang ${rebuilt})\n`,
+);
 process.stdout.write(`gagal/tanpa-halaman: ${fail.join(',') || 'none'}\n`);

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import { parsePatchFromHtml, fetchPatchFromHub, resolvePatch, readExistingPatch, PATCH_RE, STATS_URL } from '../scripts/patch-source.mjs';
+import { parsePatchFromHtml, fetchPatchFromHub, resolvePatch, readExistingPatch, hasForceFlag, patchArgFromArgv, shouldSkipUpdate, PATCH_RE, STATS_URL } from '../scripts/patch-source.mjs';
 
 describe('scripts/patch-source', () => {
   describe('parsePatchFromHtml', () => {
@@ -192,6 +192,36 @@ describe('scripts/patch-source', () => {
         fallback: '0.0.1',
       });
       expect(result).toEqual({ patch: '0.0.1', source: 'fallback' });
+    });
+  });
+
+  describe('force mode', () => {
+    it('hasForceFlag baca --force / -f', () => {
+      expect(hasForceFlag(['node', 'script', '--force'])).toBe(true);
+      expect(hasForceFlag(['node', 'script', '-f'])).toBe(true);
+      expect(hasForceFlag(['node', 'script', '2.2.16', '--force'])).toBe(true);
+      expect(hasForceFlag(['node', 'script'])).toBe(false);
+      expect(hasForceFlag(['node', 'script', '2.2.16'])).toBe(false);
+    });
+    it('patchArgFromArgv abaikan flag', () => {
+      expect(patchArgFromArgv(['node', 'script', '--force'])).toBeUndefined();
+      expect(patchArgFromArgv(['node', 'script', '--force', '2.3.0'])).toBe('2.3.0');
+      expect(patchArgFromArgv(['node', 'script', '2.3.0', '-f'])).toBe('2.3.0');
+      expect(patchArgFromArgv(['node', 'script'])).toBeUndefined();
+    });
+    it('resolvePatch tidak anggap --force sebagai label patch', async () => {
+      const result = await resolvePatch({
+        argv: ['node', 'script', '--force'],
+        env: {},
+        fetcher: async () => ({ ok: true, text: async () => '["Patch 2.2.16"]' }),
+      });
+      expect(result).toEqual({ patch: '2.2.16', source: 'mlbbhub' });
+    });
+    it('shouldSkipUpdate: skip saat patch sama tanpa hero baru, kecuali force', () => {
+      expect(shouldSkipUpdate({ existingPatch: '2.2.16', patch: '2.2.16', newHeroCount: 0, force: false })).toBe(true);
+      expect(shouldSkipUpdate({ existingPatch: '2.2.16', patch: '2.2.16', newHeroCount: 0, force: true })).toBe(false);
+      expect(shouldSkipUpdate({ existingPatch: '2.2.16', patch: '2.2.16', newHeroCount: 2, force: false })).toBe(false);
+      expect(shouldSkipUpdate({ existingPatch: '2.1.95a', patch: '2.2.16', newHeroCount: 0, force: false })).toBe(false);
     });
   });
 

@@ -76,6 +76,11 @@ jobs:
       # plugin in vite.config.ts reads process.env.GOOGLE_SITE_VERIFICATION
       # at build time and injects the meta tag into index.html.
       GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
+      # Cloudflare Web Analytics beacon token. Same source: `cf` environment
+      # variables. The Vite plugin reads process.env.CF_ANALYTICS_TOKEN at
+      # build time and injects the beacon script. Empty = no beacon
+      # (safe for forks and PR previews without analytics).
+      CF_ANALYTICS_TOKEN: ${{ vars.CF_ANALYTICS_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -162,6 +167,9 @@ jobs:
     env:
       # Same source as the preview job: environment variables on `cf`.
       GOOGLE_SITE_VERIFICATION: ${{ vars.GOOGLE_SITE_VERIFICATION }}
+      # Same source: `cf` environment variables. Injects the Cloudflare Web
+      # Analytics beacon at build time; empty = no beacon.
+      CF_ANALYTICS_TOKEN: ${{ vars.CF_ANALYTICS_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7

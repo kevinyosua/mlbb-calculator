@@ -21,6 +21,11 @@
   --sp6: 24px;
 }
 
+::selection {
+  background: rgba(251, 191, 36, 0.85);
+  color: #0c1322;
+}
+
 html {
   --mdc-scroll-pad: 120px;
   /* Keyboard inset published by useKeyboardInset() (visualViewport delta). */
@@ -29,10 +34,17 @@ html {
   /* Sticky-bottom filter bar can shift the viewport anchor on first paint;
      disable anchoring so layout changes don't yank the user away from top. */
   overflow-anchor: none;
+  /* iOS paints a gray/blue flash on tap; the app ships its own :active
+     feedback (scale + bg) so the native highlight is pure noise. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
   margin: 0;
+  /* Kill pull-to-refresh: an accidental mid-draft overscroll must never
+     reload the page. Draft state persists, but scroll/filter context would
+     still be lost. */
+  overscroll-behavior-y: none;
   background:
     radial-gradient(120% 60% at 50% -10%, #101a3a 0%, var(--bg) 60%) fixed,
     var(--bg);
@@ -48,6 +60,11 @@ button {
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
+  /* Rapid draft tapping: iOS long-press on button text otherwise pops the
+     selection/callout UI and lands the next tap on the wrong control. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   transition:
     background 150ms,
     transform 80ms,
@@ -80,6 +97,13 @@ select {
   color: var(--text);
   font-size: 16px;
   padding: 6px 10px;
+}
+
+input::placeholder {
+  /* UA default gray (~3.9:1 on slate-deep) fails the 4.5 floor;
+     muted clears it at ~9.8:1. opacity:1 — Firefox dims placeholders. */
+  color: var(--muted);
+  opacity: 1;
 }
 
 .mdc-card {
@@ -188,6 +212,19 @@ select {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  position: relative;
+}
+/* Hit-area expansion: avatars clamp down to ~24-30px on phones, under the
+   44px touch floor. The ::after grows the tappable zone to slot + half the
+   row gap on each side — the largest zone that never overlaps a neighbor,
+   so a tap can't remove the wrong hero. */
+.mdc-avatarbtn::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.mdc-fb-row .mdc-avatarbtn::after {
+  inset: -2px;
 }
 
 .mdc-side-blue {
@@ -227,28 +264,6 @@ select {
   }
 }
 
-.mdc-fab {
-  position: fixed;
-  right: 16px;
-  bottom: calc(16px + env(safe-area-inset-bottom));
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  font-size: 22px;
-  padding: 0;
-  z-index: 50;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-}
-.mdc-fab-dot {
-  position: absolute;
-  top: 10px;
-  right: 12px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--gold);
-}
-
 /* ---- layout utils: static styles live here, not in JSX ---- */
 .mdc-app {
   background: var(--bg);
@@ -256,7 +271,12 @@ select {
   min-height: 100svh;
   max-width: 640px;
   margin: 0 auto;
-  padding: 12px 12px calc(4px + env(safe-area-inset-bottom));
+  /* Landscape iPhone: the notch claims ~47-59px on each side; without the
+     insets the topbar and filter bar slide under it. --mdc-px/pr also feed
+     .mdc-fb so its background still reaches the viewport edge. */
+  --mdc-px: max(12px, env(safe-area-inset-left));
+  --mdc-pr: max(12px, env(safe-area-inset-right));
+  padding: 12px var(--mdc-pr) calc(4px + env(safe-area-inset-bottom)) var(--mdc-px);
   font-family: system-ui;
 }
 .mdc-topbar {
@@ -264,6 +284,9 @@ select {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+}
+.mdc-topbar button {
+  min-width: 44px;
 }
 .mdc-brand {
   font-size: 19px;
@@ -310,9 +333,6 @@ select {
   flex-wrap: wrap;
   min-height: var(--slot-size, 44px);
 }
-.mdc-mt4 {
-  margin-top: 4px;
-}
 .mdc-mt6 {
   margin-top: 6px;
 }
@@ -346,14 +366,6 @@ select {
 }
 .mdc-warn b {
   color: var(--gold);
-}
-.mdc-ul-loose {
-  margin: 4px 0;
-  padding-left: 18px;
-}
-.mdc-ul-tight {
-  margin: 4px 0 0;
-  padding-left: 18px;
 }
 .mdc-err {
   border-color: var(--red);
@@ -419,12 +431,6 @@ select {
   order: 1;
   margin: 4px 0 0;
   min-width: 0;
-}
-.mdc-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 4px;
 }
 .mdc-synergy {
   color: #6ee7b7;
@@ -521,7 +527,7 @@ select {
   position: sticky;
   /* --mdc-kb lifts the bar above the virtual keyboard; env() alone only
      covers the home indicator, never the keyboard. */
-  bottom: calc(8px + var(--mdc-kb) + env(safe-area-inset-bottom));
+  bottom: calc(var(--mdc-kb) + env(safe-area-inset-bottom));
   z-index: 40;
   background: var(--card);
   border: 1px solid var(--border);
@@ -532,6 +538,7 @@ select {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
   /* The floating bar is a fixed-height island; let HeroRows flow up to it
      instead of leaving an awkward gap at the bottom of the document. */
   margin: 4px 0 0;
@@ -578,10 +585,22 @@ select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+/* 32px visual, 44px hit zone (inset -6px). Adjacent iconbtns get an extra
+   8px gap so their expanded zones touch but never overlap — a tap in the
+   seam can't fire the wrong button. */
+.mdc-iconbtn::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+}
+.mdc-frow .mdc-iconbtn + .mdc-iconbtn {
+  margin-left: 8px;
 }
 .mdc-filter-closed {
   position: sticky;
-  bottom: calc(8px + var(--mdc-kb) + env(safe-area-inset-bottom));
+  bottom: calc(var(--mdc-kb) + env(safe-area-inset-bottom));
   z-index: 40;
   display: flex;
   justify-content: flex-end;
@@ -654,23 +673,43 @@ select {
 .mdc-score > i.mdc-bar {
   width: var(--bar, 0%);
 }
-.mdc-sheet-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  z-index: 60;
+
+/* ---- clear-draft pill (destructive bulk action, two-tap confirm) ---- */
+.mdc-clear-row {
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  justify-content: flex-end;
+  margin: 0 0 8px;
 }
-.mdc-sheet {
-  width: 100%;
-  max-width: 640px;
-  background: var(--card);
+.mdc-clearbtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  background: none;
   border: 1px solid var(--border);
-  border-bottom: none;
-  border-radius: 16px 16px 0 0;
-  padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+  border-radius: 99px;
+}
+/* 36px visual, 44px hit zone. */
+.mdc-clearbtn::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+}
+.mdc-clearbtn:hover {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
+}
+.mdc-clearbtn-armed,
+.mdc-clearbtn-armed:hover {
+  background: var(--red-dim);
+  border-color: rgba(248, 113, 113, 0.55);
+  color: #fca5a5;
 }
 
 /* Keep HeroRows clear of the sticky floating board when scrollIntoView
@@ -689,7 +728,9 @@ select {
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--goldline);
   padding: 6px 10px;
-  margin: 0 -12px 8px;
+  /* Bleed to the viewport edge regardless of safe-area padding (landscape
+     notch) — the vars are defined on .mdc-app and cascade down. */
+  margin: 0 calc(var(--mdc-pr, 12px) * -1) 8px calc(var(--mdc-px, 12px) * -1);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -721,19 +762,6 @@ select {
 }
 .mdc-fb-bans {
   opacity: 0.75;
-}
-.mdc-fb-rate {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  font-size: 0.95em;
-  padding: 0 4px;
-  flex-shrink: 0;
-}
-.mdc-fb-rate-ally {
-  color: var(--blue);
-}
-.mdc-fb-rate-enemy {
-  color: var(--red);
 }
 .mdc-fb-ally {
   border-left: 2px solid var(--blue);
@@ -869,15 +897,6 @@ select {
 .mdc-rate-side-enemy .mdc-rate-num {
   order: 0;
 }
-.mdc-rate-vs-sep {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  flex-shrink: 0;
-  padding: 0 2px;
-}
 
 /* Floating-board stats row: ally power, win%, enemy power, all centered
    under the picks/bans row. Small, readable, equal-weight layout. */
@@ -902,7 +921,7 @@ select {
   opacity: 0.85;
 }
 .mdc-fb-stat-lbl {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -990,7 +1009,6 @@ select {
   text-align: center;
   line-height: 1;
 }
-
 /* Ally bar: fills from RIGHT (toward center win%). Enemy bar: fills from LEFT.
    Direction is handled by flex `justify-content` on the parent .mdc-score
    (scoped to .mdc-rate-vs above) — the <i> width then flows from the
@@ -1037,7 +1055,7 @@ select {
   line-height: 1;
 }
 .mdc-rate-win-lbl {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.16em;
   color: var(--gold);

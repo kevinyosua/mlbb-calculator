@@ -21,13 +21,50 @@ try {
   data = { heroes: [], counters: [], syn: [], meta: [], patches: [], weights: { counter: 0.5, meta: 0.3, comp: 0.15, mastery: 0.05 } };
 }
 
+// Draft survival: mid-draft the user switches to the game; iOS Safari can
+// discard the tab under memory pressure and pull-to-refresh used to wipe the
+// draft. Persist the four lines + lang so a reload never costs the picks.
+// Unknown hero ids (removed in a patch) are dropped on restore.
+const DRAFT_KEY = 'mlbb-draft-v1';
+function restoreDraft(): { allies: string[]; enemies: string[]; ourBans: string[]; enemyBans: string[]; lang: Lang } {
+  const empty = { allies: [], enemies: [], ourBans: [], enemyBans: [], lang: 'id' as Lang };
+  if (typeof localStorage === 'undefined') return empty;
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return empty;
+    const s = JSON.parse(raw) as Record<string, unknown>;
+    const ids = new Set(data.heroes.map((h) => h.id));
+    const keep = (v: unknown) =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && ids.has(x)) : [];
+    return {
+      allies: keep(s.allies),
+      enemies: keep(s.enemies),
+      ourBans: keep(s.ourBans),
+      enemyBans: keep(s.enemyBans),
+      lang: s.lang === 'en' ? 'en' : 'id',
+    };
+  } catch {
+    return empty;
+  }
+}
+const restored = restoreDraft();
+
 export default function App() {
-  const [lang, setLang] = useState<Lang>('id');
-  const [allies, setAllies] = useState<string[]>([]);
-  const [enemies, setEnemies] = useState<string[]>([]);
-  const [ourBans, setOurBans] = useState<string[]>([]);
-  const [enemyBans, setEnemyBans] = useState<string[]>([]);
+  const [lang, setLang] = useState<Lang>(restored.lang);
+  const [allies, setAllies] = useState<string[]>(restored.allies);
+  const [enemies, setEnemies] = useState<string[]>(restored.enemies);
+  const [ourBans, setOurBans] = useState<string[]>(restored.ourBans);
+  const [enemyBans, setEnemyBans] = useState<string[]>(restored.enemyBans);
   const bans = useMemo(() => [...ourBans, ...enemyBans], [ourBans, enemyBans]);
+  // Write-through persistence: every draft change lands in localStorage
+  // immediately (cheap JSON), so tab discard / reload restores it.
+  useEffect(() => {
+    try {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify({ allies, enemies, ourBans, enemyBans, lang }));
+    } catch {
+      /* private mode / quota: draft just won't persist */
+    }
+  }, [allies, enemies, ourBans, enemyBans, lang]);
 
   const [q, setQ] = useState('');
   const [lane, setLane] = useState(ALL_LANE);
@@ -35,6 +72,14 @@ export default function App() {
   const [tier, setTier] = useState<string | null>(null);
   const [openHero, setOpenHero] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(true);
+  // Two-tap confirm for the destructive clear-draft pill: first tap arms
+  // (label flips to "Sure?"), second tap within the window wipes the draft.
+  const [confirmClear, setConfirmClear] = useState(false);
+  useEffect(() => {
+    if (!confirmClear) return;
+    const t = setTimeout(() => setConfirmClear(false), 2600);
+    return () => clearTimeout(t);
+  }, [confirmClear]);
   const qRef = useRef<HTMLInputElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const heroRowsRef = useRef<HTMLDivElement>(null);
@@ -251,6 +296,31 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {(allies.length > 0 || enemies.length > 0 || ourBans.length > 0 || enemyBans.length > 0) && (
+        <div className="mdc-clear-row">
+          <button
+            type="button"
+            className={`mdc-clearbtn${confirmClear ? ' mdc-clearbtn-armed' : ''}`}
+            onClick={() => {
+              if (!confirmClear) {
+                setConfirmClear(true);
+                return;
+              }
+              setConfirmClear(false);
+              setAllies([]);
+              setEnemies([]);
+              setOurBans([]);
+              setEnemyBans([]);
+            }}
+          >
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12">
+              <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>{' '}
+            {confirmClear ? t.confirmClear : t.clearDraft}
+          </button>
+        </div>
+      )}
 
       {lastErr ? (
         <section className="mdc-card mdc-err mdc-mt8" role="alert">

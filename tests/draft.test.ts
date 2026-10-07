@@ -159,7 +159,8 @@ describe('draft', () => {
     expect(allyWarnings(s, ['a'])).toEqual([]);
   });
   it('teamWeakness flags empty team fully', () => {
-    expect(teamWeakness(heroes, [], { missing: 'Missing', noFrontline: 'NF', noDamage: 'ND' })).toHaveLength(7);
+    const w = teamWeakness(heroes, [], { missing: 'Missing', noFrontline: 'NF', noDamage: 'ND' });
+    expect([...w.missing, ...w.gaps]).toHaveLength(7);
   });
   it('rankList: allies-only draft sorts by synergy count, badges visible', () => {
     const tigSyn = syn.filter((s) => s.type === 'SYNERGY' && (s.source === 'tigreal' || s.target === 'tigreal'));

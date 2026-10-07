@@ -167,6 +167,7 @@ function HeroRow(p: HeroRowProps) {
     wasExpanded.current = p.expanded;
   }, [p.expanded]);
   const { h, i, where, rec, mt, m } = p;
+  const nameOf = (id: string) => p.heroes.find((x) => x.id === id)?.name ?? id;
   const act = (s: Side, label: string, fullLabel: string) => {
     const banned = s === 'ourBan' || s === 'enemyBan';
     return (
@@ -207,13 +208,13 @@ function HeroRow(p: HeroRowProps) {
         {rec && (rec.counters.length > 0 || (rec.allies?.length ?? 0) > 0) && (
           <span className="mdc-inline-tags">
             {rec.counters.map((c) => (
-              <span key={c} className="mdc-chip mdc-counter" title={`Counters ${c}`}>
-                ⚔ {c}
+              <span key={c} className="mdc-chip mdc-counter" title={`Counters ${nameOf(c)}`}>
+                ⚔ {nameOf(c)}
               </span>
             ))}
             {(rec.allies ?? []).map((a) => (
-              <span key={a} className="mdc-chip mdc-synergy" title={`Synergy with ${a}`}>
-                ✦ {a}
+              <span key={a} className="mdc-chip mdc-synergy" title={`Synergy with ${nameOf(a)}`}>
+                ✦ {nameOf(a)}
               </span>
             ))}
           </span>
@@ -248,28 +249,6 @@ function HeroRow(p: HeroRowProps) {
                 <li key={x}>{x}</li>
               ))}
             </ul>
-          )}
-          {rec && (
-            <>
-              <div className="mdc-muted mdc-mt4">
-                counter {Math.round(rec.breakdown.counter)} · meta {Math.round(rec.breakdown.meta)} · comp {Math.round(rec.breakdown.comp)}{' '}
-                · mastery {Math.round(rec.breakdown.mastery)}
-              </div>
-              {(rec.counters.length > 0 || (rec.allies?.length ?? 0) > 0) && (
-                <div className="mdc-tags">
-                  {rec.counters.map((c) => (
-                    <span key={c} className="mdc-chip mdc-counter" title={`Counters ${c}`}>
-                      ⚔ {c}
-                    </span>
-                  ))}
-                  {(rec.allies ?? []).map((a) => (
-                    <span key={a} className="mdc-chip mdc-synergy" title={`Synergy with ${a}`}>
-                      ✦ {a}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </>
           )}
           <div className="mdc-actions" ref={actionsRef}>
             <div className="mdc-actgroup">

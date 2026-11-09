@@ -1,3 +1,8 @@
+## [2.2.16a] - 2026-11-09
+- data:update
+- counters:update
+- icons:cache
+
 ## [2.2.16a] - 2026-10-30
 - data:update
 - counters:update

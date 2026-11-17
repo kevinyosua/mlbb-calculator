@@ -1,7 +1,7 @@
 {
   "name": "mlbb-draft",
   "private": true,
-  "version": "2.2.16a",
+  "version": "2.2.23",
   "type": "module",
   "packageManager": "pnpm@12.3.4",
   "engines": {
